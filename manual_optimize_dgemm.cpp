@@ -31,11 +31,14 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   const uint32_t TILE_H = 32;
   const uint32_t TILE_W = 32;
+  const uint32_t TILE_K = 32;
 
   const uint32_t m_outer_bound = (M + TILE_H - 1) / TILE_H;
   const uint32_t n_outer_bound = (N + TILE_W - 1) / TILE_W;
+  const uint32_t k_outer_bound = (K + TILE_K - 1) / TILE_K;
   const uint32_t m_inner_bound = TILE_H;
   const uint32_t n_inner_bound = TILE_W;
+  const uint32_t k_inner_bound = TILE_K;
 
   for (uint32_t m_outer = 0; m_outer < m_outer_bound; ++m_outer) {
     for (uint32_t n_outer = 0; n_outer < n_outer_bound; ++n_outer) {
@@ -44,10 +47,20 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
           uint32_t m = m_outer * m_inner_bound + m_inner;
           uint32_t n = n_outer * n_inner_bound + n_inner;
           if (m < M && n < N) {
-            uint32_t c_index = m * N + n;
-            C[c_index] = 0.0;
-            for (uint32_t k = 0; k < K; k++) {
-              C[c_index] += A[K * m + k] * Bb[K * n + k];
+            C[m * N + n] = 0.0;
+          }
+        }
+      }
+      for (uint32_t k_outer = 0; k_outer < k_outer_bound; ++k_outer) {
+        for (uint32_t k_inner = 0; k_inner < k_inner_bound; ++k_inner) {
+          for (uint32_t m_inner = 0; m_inner < m_inner_bound; ++m_inner) {
+            for (uint32_t n_inner = 0; n_inner < n_inner_bound; ++n_inner) {
+              uint32_t m = m_outer * m_inner_bound + m_inner;
+              uint32_t n = n_outer * n_inner_bound + n_inner;
+              uint32_t k = k_outer * k_inner_bound + k_inner;
+              if (m < M && n < N && k < K) {
+                C[m * N + n] += A[K * m + k] * Bb[K * n + k];
+              }
             }
           }
         }
@@ -76,7 +89,8 @@ int main() {
   beta = 0.0;
 
   printf(
-      " Allocating memory for matrices aligned on 64-byte boundary for better "
+      " Allocating memory for matrices aligned on 64-byte boundary for "
+      "better "
       "\n"
       " performance \n\n");
   A = (double *)malloc(m * k * sizeof(double));
