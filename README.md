@@ -69,5 +69,5 @@ for my hardware in single thread
 | Theory|64|
 | MKL |56.971941|
 |OpenBlas|51.170771|
-|naive-ijk|0.713579|
-|manual|0.777468|
+|naive-ijk|1.960400|
+|manual|2.071832|
