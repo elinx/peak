@@ -70,7 +70,7 @@ int main()
     printf("\n Computations completed.\n\n");
     double elapsed = 1e6 * Halide::Tools::benchmark([&]()
                                                     { naive_dgemm(A, B, C, m, n, k); });
-    printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 1e-3 / elapsed);
+    printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 2 * 1e-3 / elapsed);
 
     printf(" Top left corner of matrix A: \n");
     for (i = 0; i < std::min(m, 6); i++)

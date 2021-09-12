@@ -59,7 +59,7 @@ int main()
     double elapsed = 1e6 * Halide::Tools::benchmark([&]()
                                                     { cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                                                                   m, n, k, alpha, A, k, B, n, beta, C, n); });
-    printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 1e-3 / elapsed);
+    printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 2 * 1e-3 / elapsed);
 
     printf(" Top left corner of matrix A: \n");
     for (i = 0; i < std::min(m, 6); i++)
