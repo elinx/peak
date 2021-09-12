@@ -70,3 +70,4 @@ for my hardware in single thread
 | MKL |56.971941|
 |OpenBlas|51.170771|
 |naive-ijk|0.713579|
+|manual|0.777468|
