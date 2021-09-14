@@ -1,3 +1,5 @@
+#include <immintrin.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -79,6 +81,168 @@ static inline void micro_kernel(const double *A, const double *B, double *C) {
   }
 }
 
+template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
+static inline void micro_kernel_intrincs(const double *A, const double *B, double *C) {
+  double *C0 = C;
+  double *C1 = C0 + CN;
+  double *C2 = C1 + CN;
+  double *C3 = C2 + CN;
+  double *C4 = C3 + CN;
+  double *C5 = C4 + CN;
+  double *C6 = C5 + CN;
+  double *C7 = C6 + CN;
+
+  __m256d c0_0 = _mm256_load_pd(C0);
+  __m256d c0_1 = _mm256_load_pd(&C0[4]);
+  __m256d c1_0 = _mm256_load_pd(C1);
+  __m256d c1_1 = _mm256_load_pd(&C1[4]);
+  __m256d c2_0 = _mm256_load_pd(C2);
+  __m256d c2_1 = _mm256_load_pd(&C2[4]);
+  __m256d c3_0 = _mm256_load_pd(C3);
+  __m256d c3_1 = _mm256_load_pd(&C3[4]);
+  __m256d c4_0 = _mm256_load_pd(C4);
+  __m256d c4_1 = _mm256_load_pd(&C4[4]);
+  __m256d c5_0 = _mm256_load_pd(C5);
+  __m256d c5_1 = _mm256_load_pd(&C5[4]);
+  __m256d c6_0 = _mm256_load_pd(C6);
+  __m256d c6_1 = _mm256_load_pd(&C6[4]);
+  __m256d c7_0 = _mm256_load_pd(C7);
+  __m256d c7_1 = _mm256_load_pd(&C7[4]);
+
+  for (uint32_t k = 0; k < K; ++k) {
+    // for (uint32_t m = 0; m < M; ++m) {  // M = 8
+    // for (uint32_t n = 0; n < N; ++n) { // N = 8
+    const double *Bp = &B[k * N];
+    const double *Ap = &A[k * M];
+
+    __m256d b0 = _mm256_load_pd(Bp);
+    __m256d b1 = _mm256_load_pd(&Bp[4]);
+
+    __m256d a0 = _mm256_broadcast_sd(&Ap[0]);
+    __m256d a1 = _mm256_broadcast_sd(&Ap[1]);
+    __m256d a2 = _mm256_broadcast_sd(&Ap[2]);
+    __m256d a3 = _mm256_broadcast_sd(&Ap[3]);
+    __m256d a4 = _mm256_broadcast_sd(&Ap[4]);
+    __m256d a5 = _mm256_broadcast_sd(&Ap[5]);
+    __m256d a6 = _mm256_broadcast_sd(&Ap[6]);
+    __m256d a7 = _mm256_broadcast_sd(&Ap[7]);
+
+    c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+    c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+    c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+    c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+    c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
+    c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
+
+    c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
+    c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
+
+    c4_0 = _mm256_fmadd_pd(a4, b0, c4_0);
+    c4_1 = _mm256_fmadd_pd(a4, b1, c4_1);
+
+    c5_0 = _mm256_fmadd_pd(a5, b0, c5_0);
+    c5_1 = _mm256_fmadd_pd(a5, b1, c5_1);
+
+    c6_0 = _mm256_fmadd_pd(a6, b0, c6_0);
+    c6_1 = _mm256_fmadd_pd(a6, b1, c6_1);
+
+    c7_0 = _mm256_fmadd_pd(a7, b0, c7_0);
+    c7_1 = _mm256_fmadd_pd(a7, b1, c7_1);
+    // C0[0] += Ap[0] * Bp[0];
+    // C0[1] += Ap[0] * Bp[1];
+    // C0[2] += Ap[0] * Bp[2];
+    // C0[3] += Ap[0] * Bp[3];
+    // C0[4] += Ap[0] * Bp[4];
+    // C0[5] += Ap[0] * Bp[5];
+    // C0[6] += Ap[0] * Bp[6];
+    // C0[7] += Ap[0] * Bp[7];
+
+    // C1[0] += Ap[1] * Bp[0];
+    // C1[1] += Ap[1] * Bp[1];
+    // C1[2] += Ap[1] * Bp[2];
+    // C1[3] += Ap[1] * Bp[3];
+    // C1[4] += Ap[1] * Bp[4];
+    // C1[5] += Ap[1] * Bp[5];
+    // C1[6] += Ap[1] * Bp[6];
+    // C1[7] += Ap[1] * Bp[7];
+
+    // C2[0] += Ap[2] * Bp[0];
+    // C2[1] += Ap[2] * Bp[1];
+    // C2[2] += Ap[2] * Bp[2];
+    // C2[3] += Ap[2] * Bp[3];
+    // C2[4] += Ap[2] * Bp[4];
+    // C2[5] += Ap[2] * Bp[5];
+    // C2[6] += Ap[2] * Bp[6];
+    // C2[7] += Ap[2] * Bp[7];
+
+    // C3[0] += Ap[3] * Bp[0];
+    // C3[1] += Ap[3] * Bp[1];
+    // C3[2] += Ap[3] * Bp[2];
+    // C3[3] += Ap[3] * Bp[3];
+    // C3[4] += Ap[3] * Bp[4];
+    // C3[5] += Ap[3] * Bp[5];
+    // C3[6] += Ap[3] * Bp[6];
+    // C3[7] += Ap[3] * Bp[7];
+
+    // C4[0] += Ap[4] * Bp[0];
+    // C4[1] += Ap[4] * Bp[1];
+    // C4[2] += Ap[4] * Bp[2];
+    // C4[3] += Ap[4] * Bp[3];
+    // C4[4] += Ap[4] * Bp[4];
+    // C4[5] += Ap[4] * Bp[5];
+    // C4[6] += Ap[4] * Bp[6];
+    // C4[7] += Ap[4] * Bp[7];
+
+    // C5[0] += Ap[5] * Bp[0];
+    // C5[1] += Ap[5] * Bp[1];
+    // C5[2] += Ap[5] * Bp[2];
+    // C5[3] += Ap[5] * Bp[3];
+    // C5[4] += Ap[5] * Bp[4];
+    // C5[5] += Ap[5] * Bp[5];
+    // C5[6] += Ap[5] * Bp[6];
+    // C5[7] += Ap[5] * Bp[7];
+
+    // C6[0] += Ap[6] * Bp[0];
+    // C6[1] += Ap[6] * Bp[1];
+    // C6[2] += Ap[6] * Bp[2];
+    // C6[3] += Ap[6] * Bp[3];
+    // C6[4] += Ap[6] * Bp[4];
+    // C6[5] += Ap[6] * Bp[5];
+    // C6[6] += Ap[6] * Bp[6];
+    // C6[7] += Ap[6] * Bp[7];
+
+    // C7[0] += Ap[7] * Bp[0];
+    // C7[1] += Ap[7] * Bp[1];
+    // C7[2] += Ap[7] * Bp[2];
+    // C7[3] += Ap[7] * Bp[3];
+    // C7[4] += Ap[7] * Bp[4];
+    // C7[5] += Ap[7] * Bp[5];
+    // C7[6] += Ap[7] * Bp[6];
+    // C7[7] += Ap[7] * Bp[7];
+    // }
+    // }
+  }
+
+  _mm256_store_pd(C0, c0_0);
+  _mm256_store_pd(&C0[4], c0_1);
+  _mm256_store_pd(C1, c1_0);
+  _mm256_store_pd(&C1[4], c1_1);
+  _mm256_store_pd(C2, c2_0);
+  _mm256_store_pd(&C2[4], c2_1);
+  _mm256_store_pd(C3, c3_0);
+  _mm256_store_pd(&C3[4], c3_1);
+  _mm256_store_pd(C4, c4_0);
+  _mm256_store_pd(&C4[4], c4_1);
+  _mm256_store_pd(C5, c5_0);
+  _mm256_store_pd(&C5[4], c5_1);
+  _mm256_store_pd(C6, c6_0);
+  _mm256_store_pd(&C6[4], c6_1);
+  _mm256_store_pd(C7, c7_0);
+  _mm256_store_pd(&C7[4], c7_1);
+}
+
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
   constexpr uint32_t TILE_H = 8;
@@ -113,7 +277,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            micro_kernel<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
+            micro_kernel_intrincs<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
                 &Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
                 &Cc[m_inner * n_inner_bound + n_inner]);
           }
