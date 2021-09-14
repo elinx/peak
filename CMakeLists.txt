@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(peak CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 17)
 add_definitions("-mavx2 -march=native")
 
 add_executable(mkl mkl_dgemm.cpp)

@@ -16,9 +16,9 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
   }
 }
 
-void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
-           uint32_t k_inner_bound, uint32_t n_outer, uint32_t n_inner_bound,
-           uint32_t n_inner_step) {
+template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
+static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
+                  uint32_t n_outer) {
   memset(Bp, 0, sizeof(double) * k_inner_bound * n_inner_bound);
   uint32_t k_start = k_outer;
   uint32_t k_end = std::min(K, k_start + k_inner_bound);
@@ -35,9 +35,9 @@ void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer
   }
 }
 
-void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
-           uint32_t m_inner_bound, uint32_t k_outer, uint32_t k_inner_bound,
-           uint32_t m_inner_step) {
+template <uint32_t m_inner_bound, uint32_t k_inner_bound, uint32_t m_inner_step>
+static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
+                  uint32_t k_outer) {
   memset(Ap, 0, sizeof(double) * k_inner_bound * m_inner_bound);
   uint32_t m_start = m_outer;
   uint32_t m_end = std::min(M, m_start + m_inner_bound);
@@ -54,8 +54,9 @@ void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer
   }
 }
 
-void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
-                uint32_t m_inner_bound, uint32_t n_outer, uint32_t n_inner_bound) {
+template <uint32_t m_inner_bound, uint32_t n_inner_bound>
+static void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
+                       uint32_t n_outer) {
   for (uint32_t m = 0; m < m_inner_bound; ++m) {
     for (uint32_t n = 0; n < n_inner_bound; ++n) {
       uint32_t C_m = m_outer + m;
@@ -67,8 +68,8 @@ void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_
   }
 }
 
-static inline void micro_kernel(const double *A, const double *B, double *C, uint32_t M, uint32_t N,
-                                uint32_t K, uint32_t CN) {
+template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
+static inline void micro_kernel(const double *A, const double *B, double *C) {
   for (uint32_t k = 0; k < K; ++k) {
     for (uint32_t m = 0; m < M; ++m) {
       for (uint32_t n = 0; n < N; ++n) {
@@ -80,24 +81,24 @@ static inline void micro_kernel(const double *A, const double *B, double *C, uin
 
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
-  const uint32_t TILE_H = 8;
-  const uint32_t TILE_W = 8;
-  const uint32_t TILE_K = 128;
+  constexpr uint32_t TILE_H = 8;
+  constexpr uint32_t TILE_W = 8;
+  constexpr uint32_t TILE_K = 128;
 
-  const uint32_t m_outer_step = TILE_H * 8;
-  const uint32_t n_outer_step = TILE_W * 16;
-  const uint32_t k_outer_step = TILE_K;
+  constexpr uint32_t m_outer_step = TILE_H * 8;
+  constexpr uint32_t n_outer_step = TILE_W * 16;
+  constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
   const uint32_t n_outer_bound = (N + n_outer_step - 1) / n_outer_step * n_outer_step;
   const uint32_t k_outer_bound = (K + n_outer_step - 1) / n_outer_step * n_outer_step;
 
-  const uint32_t m_inner_bound = m_outer_step;
-  const uint32_t n_inner_bound = n_outer_step;
-  const uint32_t k_inner_bound = k_outer_step;
+  constexpr uint32_t m_inner_bound = m_outer_step;
+  constexpr uint32_t n_inner_bound = n_outer_step;
+  constexpr uint32_t k_inner_bound = k_outer_step;
 
-  const uint32_t m_inner_step = TILE_H;
-  const uint32_t n_inner_step = TILE_W;
+  constexpr uint32_t m_inner_step = TILE_H;
+  constexpr uint32_t n_inner_step = TILE_W;
 
   double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
   double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
@@ -106,18 +107,18 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
     for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
-      PackB(Bc, B, K, N, k_outer, k_inner_bound, n_outer, n_inner_bound, n_inner_step);
+      PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, B, K, N, k_outer, n_outer);
       for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
-        PackA(Ac, A, M, K, m_outer, m_inner_bound, k_outer, k_inner_bound, m_inner_step);
+        PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, A, M, K, m_outer, k_outer);
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            micro_kernel(&Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
-                         &Cc[m_inner * n_inner_bound + n_inner], m_inner_step, n_inner_step,
-                         k_inner_bound, n_inner_bound);
+            micro_kernel<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
+                &Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
+                &Cc[m_inner * n_inner_bound + n_inner]);
           }
         }
-        WriteBackC(Cc, C, M, N, m_outer, m_inner_bound, n_outer, n_inner_bound);
+        WriteBackC<m_inner_bound, n_inner_bound>(Cc, C, M, N, m_outer, n_outer);
       }
     }
   }
