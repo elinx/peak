@@ -67,6 +67,17 @@ void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_
   }
 }
 
+static inline void micro_kernel(const double *A, const double *B, double *C, uint32_t M, uint32_t N,
+                                uint32_t K, uint32_t CN) {
+  for (uint32_t k = 0; k < K; ++k) {
+    for (uint32_t m = 0; m < M; ++m) {
+      for (uint32_t n = 0; n < N; ++n) {
+        C[m * CN + n] += A[k * M + m] * B[k * N + n];
+      }
+    }
+  }
+}
+
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
   const uint32_t TILE_H = 8;
@@ -101,17 +112,9 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            for (uint32_t k_inner = 0; k_inner < k_inner_bound; ++k_inner) {
-              for (uint32_t mm = 0; mm < m_inner_step; ++mm) {
-                for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
-                  uint32_t m = m_inner + mm;
-                  uint32_t n = n_inner + nn;
-                  Cc[m * n_inner_bound + n] +=
-                      Ac[m_inner * k_inner_bound + k_inner * m_inner_step + mm] *
-                      Bc[n_inner * k_inner_bound + k_inner * n_inner_step + nn];
-                }
-              }
-            }
+            micro_kernel(&Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
+                         &Cc[m_inner * n_inner_bound + n_inner], m_inner_step, n_inner_step,
+                         k_inner_bound, n_inner_bound);
           }
         }
         WriteBackC(Cc, C, M, N, m_outer, m_inner_bound, n_outer, n_inner_bound);
