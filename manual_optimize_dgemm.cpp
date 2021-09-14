@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 #include "halide_benchmark.h"
 #include "halide_macros.h"
@@ -15,46 +16,111 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
   }
 }
 
+void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
+           uint32_t k_inner_bound, uint32_t n_outer, uint32_t n_inner_bound,
+           uint32_t n_inner_step) {
+  memset(Bp, 0, sizeof(double) * k_inner_bound * n_inner_bound);
+  uint32_t k_start = k_outer;
+  uint32_t k_end = std::min(K, k_start + k_inner_bound);
+  uint32_t n_start = n_outer;
+  uint32_t n_end = std::min(N, n_start + n_inner_bound);
+  for (uint32_t k = k_start; k < k_end; ++k) {
+    for (uint32_t n = n_start; n < n_end; ++n) {
+      uint32_t r = (n - n_start) / n_inner_step;
+      uint32_t rr = (n - n_start) % n_inner_step;
+      uint32_t c = k - k_start;
+      uint32_t i = r * n_inner_step * k_inner_bound + c * n_inner_step + rr;
+      Bp[i] = B[k * N + n];
+    }
+  }
+}
+
+void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
+           uint32_t m_inner_bound, uint32_t k_outer, uint32_t k_inner_bound,
+           uint32_t m_inner_step) {
+  memset(Ap, 0, sizeof(double) * k_inner_bound * m_inner_bound);
+  uint32_t m_start = m_outer;
+  uint32_t m_end = std::min(M, m_start + m_inner_bound);
+  uint32_t k_start = k_outer;
+  uint32_t k_end = std::min(K, k_start + k_inner_bound);
+  for (uint32_t k = k_start; k < k_end; ++k) {
+    for (uint32_t m = m_start; m < m_end; ++m) {
+      uint32_t r = (m - m_start) / m_inner_step;
+      uint32_t rr = (m - m_start) % m_inner_step;
+      uint32_t c = k - k_start;
+      uint32_t i = r * m_inner_step * k_inner_bound + c * m_inner_step + rr;
+      Ap[i] = A[m * K + k];
+    }
+  }
+}
+
+void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
+                uint32_t m_inner_bound, uint32_t n_outer, uint32_t n_inner_bound) {
+  for (uint32_t m = 0; m < m_inner_bound; ++m) {
+    for (uint32_t n = 0; n < n_inner_bound; ++n) {
+      uint32_t C_m = m_outer + m;
+      uint32_t C_n = n_outer + n;
+      if (C_m < M && C_n < N) {
+        C[C_m * N + C_n] += Cc[m * n_inner_bound + n];
+      }
+    }
+  }
+}
+
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
-  const uint32_t TILE_H = 32;
-  const uint32_t TILE_W = 32;
-  const uint32_t TILE_K = 32;
+  const uint32_t TILE_H = 8;
+  const uint32_t TILE_W = 8;
+  const uint32_t TILE_K = 128;
 
-  const uint32_t m_outer_bound = (M + TILE_H - 1) / TILE_H * TILE_H;
-  const uint32_t n_outer_bound = (N + TILE_W - 1) / TILE_W * TILE_W;
-  const uint32_t k_outer_bound = (K + TILE_K - 1) / TILE_K * TILE_K;
-  const uint32_t m_inner_bound = TILE_H;
-  const uint32_t n_inner_bound = TILE_W;
-  const uint32_t k_inner_bound = TILE_K;
+  const uint32_t m_outer_step = TILE_H * 8;
+  const uint32_t n_outer_step = TILE_W * 16;
+  const uint32_t k_outer_step = TILE_K;
 
-  for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += TILE_H) {
-    for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += TILE_W) {
-      for (uint32_t m_inner = 0; m_inner < m_inner_bound; ++m_inner) {
-        for (uint32_t n_inner = 0; n_inner < n_inner_bound; ++n_inner) {
-          uint32_t m = m_outer + m_inner;
-          uint32_t n = n_outer + n_inner;
-          if (m < M && n < N) {
-            C[m * N + n] = 0.0;
-          }
-        }
-      }
-      for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += TILE_K) {
-        for (uint32_t k_inner = 0; k_inner < k_inner_bound; ++k_inner) {
-          for (uint32_t m_inner = 0; m_inner < m_inner_bound; ++m_inner) {
-            for (uint32_t n_inner = 0; n_inner < n_inner_bound; ++n_inner) {
-              uint32_t m = m_outer + m_inner;
-              uint32_t n = n_outer + n_inner;
-              uint32_t k = k_outer + k_inner;
-              if (m < M && n < N && k < K) {
-                C[m * N + n] += A[K * m + k] * B[k * N + n];
+  const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
+  const uint32_t n_outer_bound = (N + n_outer_step - 1) / n_outer_step * n_outer_step;
+  const uint32_t k_outer_bound = (K + n_outer_step - 1) / n_outer_step * n_outer_step;
+
+  const uint32_t m_inner_bound = m_outer_step;
+  const uint32_t n_inner_bound = n_outer_step;
+  const uint32_t k_inner_bound = k_outer_step;
+
+  const uint32_t m_inner_step = TILE_H;
+  const uint32_t n_inner_step = TILE_W;
+
+  double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
+  double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
+  double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * n_inner_bound);
+  memset(C, 0, M * N * sizeof(double));
+
+  for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
+    for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
+      PackB(Bc, B, K, N, k_outer, k_inner_bound, n_outer, n_inner_bound, n_inner_step);
+      for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
+        PackA(Ac, A, M, K, m_outer, m_inner_bound, k_outer, k_inner_bound, m_inner_step);
+        memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
+        for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
+          for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
+            for (uint32_t k_inner = 0; k_inner < k_inner_bound; ++k_inner) {
+              for (uint32_t mm = 0; mm < m_inner_step; ++mm) {
+                for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
+                  uint32_t m = m_inner + mm;
+                  uint32_t n = n_inner + nn;
+                  Cc[m * n_inner_bound + n] +=
+                      Ac[m_inner * k_inner_bound + k_inner * m_inner_step + mm] *
+                      Bc[n_inner * k_inner_bound + k_inner * n_inner_step + nn];
+                }
               }
             }
           }
         }
+        WriteBackC(Cc, C, M, N, m_outer, m_inner_bound, n_outer, n_inner_bound);
       }
     }
   }
+  free(Cc);
+  free(Ac);
+  free(Bc);
 }
 
 int main() {
