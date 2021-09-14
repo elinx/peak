@@ -4,8 +4,8 @@
 #include "halide_benchmark.h"
 #include "halide_macros.h"
 
-void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M,
-                 const uint32_t N, const uint32_t K) {
+void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
+                 const uint32_t K) {
   for (uint32_t i = 0; i < M; i++) {
     for (uint32_t j = 0; j < N; j++) {
       double sum = 0.0;
@@ -25,8 +25,8 @@ double *transpose(const double *B, const uint32_t K, const uint32_t N) {
   return Bb;
 }
 
-void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
-                  const uint32_t N, const uint32_t K) {
+void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
+                  const uint32_t K) {
   double *Bb = transpose(B, K, N);
 
   const uint32_t TILE_H = 32;
@@ -138,8 +138,7 @@ int main() {
 
   manual_dgemm(A, B, C, m, n, k);
   printf("\n Computations completed.\n\n");
-  double elapsed =
-      1e6 * Halide::Tools::benchmark([&]() { manual_dgemm(A, B, C, m, n, k); });
+  double elapsed = 1e6 * Halide::Tools::benchmark([&]() { manual_dgemm(A, B, C, m, n, k); });
   printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 2 * 1e-3 / elapsed);
 
   printf(" Top left corner of matrix A: \n");
