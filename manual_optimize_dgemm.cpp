@@ -15,20 +15,8 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
   }
 }
 
-double *transpose(const double *B, const uint32_t K, const uint32_t N) {
-  double *Bb = (double *)malloc(K * N * sizeof(double));
-  for (uint32_t n = 0; n < N; ++n) {
-    for (uint32_t k = 0; k < K; ++k) {
-      Bb[n * K + k] = B[k * N + n];
-    }
-  }
-  return Bb;
-}
-
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
-  double *Bb = transpose(B, K, N);
-
   const uint32_t TILE_H = 32;
   const uint32_t TILE_W = 32;
   const uint32_t TILE_K = 32;
@@ -59,7 +47,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
               uint32_t n = n_outer + n_inner;
               uint32_t k = k_outer + k_inner;
               if (m < M && n < N && k < K) {
-                C[m * N + n] += A[K * m + k] * Bb[K * n + k];
+                C[m * N + n] += A[K * m + k] * B[k * N + n];
               }
             }
           }
@@ -67,7 +55,6 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
       }
     }
   }
-  free(Bb);
 }
 
 int main() {
