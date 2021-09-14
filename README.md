@@ -4,6 +4,7 @@ This project helps to explore your hardware and achieve the peak performance for
 # Enviroment
 * OS: ubuntu 20.04
 * Compiler: GCC 9.3.0
+    - optimization level: -O3
 * Platform: x86_x64
 * Hardware info:
 ```
@@ -43,6 +44,8 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
                                  ibrs ibpb stibp fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves md_clear flush_l1d arch_capabilities
 ```
 * Miroarch: Coffee Lake (AVX2)
+    - Registers: 16 x 256bit
+
 ![coffee lake microarch](./images/skylake_block_diagram.svg)
 
 # Theorical Peak Performance
@@ -70,4 +73,4 @@ for my hardware in single thread
 | MKL |56.971941|
 |OpenBlas|51.170771|
 |naive-ijk|1.960400|
-|manual|2.071832|
+|manual|4.371131|
