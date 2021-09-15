@@ -103,43 +103,28 @@ static inline void micro_kernel_intrincs_4x8(const double *A, const double *B, d
 
   const double *Bp = B;
   const double *Ap = A;
-  for (uint32_t k = 0; k < K; k += 2) {
+  for (uint32_t k = 0; k < K; ++k) {
     __m256d b0 = _mm256_load_pd(Bp);
     __m256d b1 = _mm256_load_pd(Bp + 4);
-    __m256d b2 = _mm256_load_pd(Bp + 8);
-    __m256d b3 = _mm256_load_pd(Bp + 12);
 
     __m256d a0 = _mm256_broadcast_sd(Ap);
     __m256d a1 = _mm256_broadcast_sd(Ap + 1);
     __m256d a2 = _mm256_broadcast_sd(Ap + 2);
     __m256d a3 = _mm256_broadcast_sd(Ap + 3);
 
-    __m256d a4 = _mm256_broadcast_sd(Ap + 4);
-    __m256d a5 = _mm256_broadcast_sd(Ap + 5);
-    __m256d a6 = _mm256_broadcast_sd(Ap + 6);
-    __m256d a7 = _mm256_broadcast_sd(Ap + 7);
-
     c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
-    c0_0 = _mm256_fmadd_pd(a4, b2, c0_0);
     c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
-    c0_1 = _mm256_fmadd_pd(a4, b3, c0_1);
 
     c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
-    c1_0 = _mm256_fmadd_pd(a5, b2, c1_0);
     c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
-    c1_1 = _mm256_fmadd_pd(a5, b3, c1_1);
 
     c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
-    c2_0 = _mm256_fmadd_pd(a6, b2, c2_0);
     c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
-    c2_1 = _mm256_fmadd_pd(a6, b3, c2_1);
 
     c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
-    c3_0 = _mm256_fmadd_pd(a7, b2, c3_0);
     c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
-    c3_1 = _mm256_fmadd_pd(a7, b3, c3_1);
-    Bp += 2 * N;
-    Ap += 2 * M;
+    Bp += N;
+    Ap += M;
   }
 
   _mm256_store_pd(C0, c0_0);
