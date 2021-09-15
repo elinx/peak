@@ -82,6 +82,62 @@ static inline void micro_kernel(const double *A, const double *B, double *C) {
 }
 
 template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
+static inline void micro_kernel_intrincs_4x8(const double *A, const double *B, double *C) {
+  double *C0 = C;
+  double *C1 = C0 + CN;
+  double *C2 = C1 + CN;
+  double *C3 = C2 + CN;
+
+  __m256d c0_0 = _mm256_load_pd(C0);
+  __m256d c0_1 = _mm256_load_pd(&C0[4]);
+  __m256d c1_0 = _mm256_load_pd(C1);
+  __m256d c1_1 = _mm256_load_pd(&C1[4]);
+  __m256d c2_0 = _mm256_load_pd(C2);
+  __m256d c2_1 = _mm256_load_pd(&C2[4]);
+  __m256d c3_0 = _mm256_load_pd(C3);
+  __m256d c3_1 = _mm256_load_pd(&C3[4]);
+
+  const double *Bp = B;
+  const double *Ap = A;
+  for (uint32_t k = 0; k < K; ++k) {
+    // for (uint32_t m = 0; m < M; ++m) {  // M = 4
+    // for (uint32_t n = 0; n < N; ++n) { // N = 8
+    __m256d b0 = _mm256_load_pd(Bp);
+    __m256d b1 = _mm256_load_pd(&Bp[4]);
+
+    __m256d a0 = _mm256_broadcast_sd(&Ap[0]);
+    __m256d a1 = _mm256_broadcast_sd(&Ap[1]);
+    __m256d a2 = _mm256_broadcast_sd(&Ap[2]);
+    __m256d a3 = _mm256_broadcast_sd(&Ap[3]);
+
+    c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+    c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+    c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+    c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+    c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
+    c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
+
+    c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
+    c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
+    // }
+    // }
+    Bp += N;
+    Ap += M;
+  }
+
+  _mm256_store_pd(C0, c0_0);
+  _mm256_store_pd(&C0[4], c0_1);
+  _mm256_store_pd(C1, c1_0);
+  _mm256_store_pd(&C1[4], c1_1);
+  _mm256_store_pd(C2, c2_0);
+  _mm256_store_pd(&C2[4], c2_1);
+  _mm256_store_pd(C3, c3_0);
+  _mm256_store_pd(&C3[4], c3_1);
+}
+
+template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
 static inline void micro_kernel_intrincs(const double *A, const double *B, double *C) {
   double *C0 = C;
   double *C1 = C0 + CN;
@@ -245,7 +301,7 @@ static inline void micro_kernel_intrincs(const double *A, const double *B, doubl
 
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
-  constexpr uint32_t TILE_H = 8;
+  constexpr uint32_t TILE_H = 4;
   constexpr uint32_t TILE_W = 8;
   constexpr uint32_t TILE_K = 128;
 
@@ -277,7 +333,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            micro_kernel_intrincs<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
+            micro_kernel_intrincs_4x8<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
                 &Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
                 &Cc[m_inner * n_inner_bound + n_inner]);
           }
