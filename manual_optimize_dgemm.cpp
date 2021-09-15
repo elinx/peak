@@ -157,32 +157,28 @@ static inline void micro_kernel_intrincs_4x8_butterfly_permutation(const double 
   const double *Bp = B;
   const double *Ap = A;
   for (uint32_t k = 0; k < K; ++k) {
-    // for (uint32_t m = 0; m < M; ++m) {  // M = 4
-    // for (uint32_t n = 0; n < N; ++n) { // N = 8
     __m256d a0 = _mm256_load_pd(Ap);
     __m256d b0 = _mm256_load_pd(Bp);
-    __m256d a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
     __m256d b1 = _mm256_load_pd(&Bp[4]);
-
-    __m256d a2 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(1, 0, 3, 2));
 
     c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
     c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
-    __m256d a3 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(0, 1, 2, 3));
 
-    c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
-    c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+    a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+    c1_0 = _mm256_fmadd_pd(a0, b0, c1_0);
+    c1_1 = _mm256_fmadd_pd(a0, b1, c1_1);
 
-    c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
-    c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
+    a0 = _mm256_permute2f128_pd(a0, a0, 0x03);
+    c3_0 = _mm256_fmadd_pd(a0, b0, c3_0);
+    c3_1 = _mm256_fmadd_pd(a0, b1, c3_1);
 
-    c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
-    c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
-    // }
-    // }
+    a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+    c2_0 = _mm256_fmadd_pd(a0, b0, c2_0);
+    c2_1 = _mm256_fmadd_pd(a0, b1, c2_1);
     Bp += N;
     Ap += M;
   }
+  // TODO: use too much temporaries, optimize this!
   __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
   __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
   __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
@@ -408,7 +404,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            micro_kernel_intrincs_4x8<m_inner_step, n_inner_step, k_inner_bound, n_inner_bound>(
+            micro_kernel_intrincs_4x8_butterfly_permutation<m_inner_step, n_inner_step,
+                                                            k_inner_bound, n_inner_bound>(
                 &Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
                 &Cc[m_inner * n_inner_bound + n_inner]);
           }
