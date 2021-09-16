@@ -25,38 +25,34 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
 template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
 static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
                   uint32_t n_outer) {
-  memset(Bp, 0, sizeof(double) * k_inner_bound * n_inner_bound);
-  uint32_t k_start = k_outer;
-  uint32_t k_end = std::min(K, k_start + k_inner_bound);
-  uint32_t n_start = n_outer;
-  uint32_t n_end = std::min(N, n_start + n_inner_bound);
-  for (uint32_t k = k_start; k < k_end; ++k) {
-    for (uint32_t n = n_start; n < n_end; ++n) {
-      uint32_t r = (n - n_start) / n_inner_step;
-      uint32_t rr = (n - n_start) % n_inner_step;
-      uint32_t c = k - k_start;
-      uint32_t i = r * n_inner_step * k_inner_bound + c * n_inner_step + rr;
-      Bp[i] = B[k * N + n];
+  for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
+    for (uint32_t k = 0; k < k_inner_bound; ++k) {
+      for (uint32_t n = 0; n < n_inner_step; ++n) {
+        if ((k + k_outer) < K && (nn + n_outer + n) < N) {
+          *Bp++ = B[k * N + n];
+        } else {
+          *Bp++ = 0;
+        }
+      }
     }
+    B += n_inner_step;
   }
 }
 
 template <uint32_t m_inner_bound, uint32_t k_inner_bound, uint32_t m_inner_step>
 static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
                   uint32_t k_outer) {
-  memset(Ap, 0, sizeof(double) * k_inner_bound * m_inner_bound);
-  uint32_t m_start = m_outer;
-  uint32_t m_end = std::min(M, m_start + m_inner_bound);
-  uint32_t k_start = k_outer;
-  uint32_t k_end = std::min(K, k_start + k_inner_bound);
-  for (uint32_t k = k_start; k < k_end; ++k) {
-    for (uint32_t m = m_start; m < m_end; ++m) {
-      uint32_t r = (m - m_start) / m_inner_step;
-      uint32_t rr = (m - m_start) % m_inner_step;
-      uint32_t c = k - k_start;
-      uint32_t i = r * m_inner_step * k_inner_bound + c * m_inner_step + rr;
-      Ap[i] = A[m * K + k];
+  for (uint32_t mm = 0; mm < m_inner_bound; mm += m_inner_step) {
+    for (uint32_t k = 0; k < k_inner_bound; ++k) {
+      for (uint32_t m = 0; m < m_inner_step; ++m) {
+        if ((k + k_outer) < K && (mm + m_outer + m) < M) {
+          *Ap++ = A[m * K + k];
+        } else {
+          *Ap++ = 0;
+        }
+      }
     }
+    A += m_inner_step * K;
   }
 }
 
@@ -317,6 +313,9 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t m_inner_step = TILE_H;
   constexpr uint32_t n_inner_step = TILE_W;
 
+  static_assert(!(n_inner_bound % n_inner_step));
+  static_assert(!(m_inner_bound % m_inner_step));
+
   double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
   double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
   double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * n_inner_bound);
@@ -324,9 +323,11 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
     for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
-      PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, B, K, N, k_outer, n_outer);
+      PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, &B[k_outer * N + n_outer], K, N,
+                                                        k_outer, n_outer);
       for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
-        PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, A, M, K, m_outer, k_outer);
+        PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
+                                                          m_outer, k_outer);
         memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
