@@ -44,7 +44,8 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
                                  ibrs ibpb stibp fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves md_clear flush_l1d arch_capabilities
 ```
 * Miroarch: Coffee Lake (AVX2)
-    - Registers: 16 x 256bit
+    - registers: 16 x 256bit
+    - cache line size: 64bytes(8 FP64)
 
 ![coffee lake microarch](./images/skylake_block_diagram.svg)
 

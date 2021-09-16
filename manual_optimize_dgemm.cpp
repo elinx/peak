@@ -178,7 +178,6 @@ static inline void micro_kernel_intrincs_4x8_butterfly_permutation(const double 
     Bp += N;
     Ap += M;
   }
-  // TODO: use too much temporaries, optimize this!
   __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
   __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
   __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
@@ -189,24 +188,24 @@ static inline void micro_kernel_intrincs_4x8_butterfly_permutation(const double 
   __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
   __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
 
-  __m256d c0_0_final = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
-  __m256d c2_0_final = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
-  __m256d c1_0_final = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
-  __m256d c3_0_final = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
+  c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
+  c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
+  c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
+  c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
 
-  __m256d c0_1_final = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
-  __m256d c2_1_final = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
-  __m256d c1_1_final = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
-  __m256d c3_1_final = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
+  c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
+  c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
+  c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
+  c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
 
-  _mm256_store_pd(C0, c0_0_final);
-  _mm256_store_pd(&C0[4], c0_1_final);
-  _mm256_store_pd(C1, c1_0_final);
-  _mm256_store_pd(&C1[4], c1_1_final);
-  _mm256_store_pd(C2, c2_0_final);
-  _mm256_store_pd(&C2[4], c2_1_final);
-  _mm256_store_pd(C3, c3_0_final);
-  _mm256_store_pd(&C3[4], c3_1_final);
+  _mm256_store_pd(C0, c0_0);
+  _mm256_store_pd(&C0[4], c0_1);
+  _mm256_store_pd(C1, c1_0);
+  _mm256_store_pd(&C1[4], c1_1);
+  _mm256_store_pd(C2, c2_0);
+  _mm256_store_pd(&C2[4], c2_1);
+  _mm256_store_pd(C3, c3_0);
+  _mm256_store_pd(&C3[4], c3_1);
 }
 template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
 static inline void micro_kernel_intrincs(const double *A, const double *B, double *C) {
@@ -277,79 +276,6 @@ static inline void micro_kernel_intrincs(const double *A, const double *B, doubl
 
     c7_0 = _mm256_fmadd_pd(a7, b0, c7_0);
     c7_1 = _mm256_fmadd_pd(a7, b1, c7_1);
-    // C0[0] += Ap[0] * Bp[0];
-    // C0[1] += Ap[0] * Bp[1];
-    // C0[2] += Ap[0] * Bp[2];
-    // C0[3] += Ap[0] * Bp[3];
-    // C0[4] += Ap[0] * Bp[4];
-    // C0[5] += Ap[0] * Bp[5];
-    // C0[6] += Ap[0] * Bp[6];
-    // C0[7] += Ap[0] * Bp[7];
-
-    // C1[0] += Ap[1] * Bp[0];
-    // C1[1] += Ap[1] * Bp[1];
-    // C1[2] += Ap[1] * Bp[2];
-    // C1[3] += Ap[1] * Bp[3];
-    // C1[4] += Ap[1] * Bp[4];
-    // C1[5] += Ap[1] * Bp[5];
-    // C1[6] += Ap[1] * Bp[6];
-    // C1[7] += Ap[1] * Bp[7];
-
-    // C2[0] += Ap[2] * Bp[0];
-    // C2[1] += Ap[2] * Bp[1];
-    // C2[2] += Ap[2] * Bp[2];
-    // C2[3] += Ap[2] * Bp[3];
-    // C2[4] += Ap[2] * Bp[4];
-    // C2[5] += Ap[2] * Bp[5];
-    // C2[6] += Ap[2] * Bp[6];
-    // C2[7] += Ap[2] * Bp[7];
-
-    // C3[0] += Ap[3] * Bp[0];
-    // C3[1] += Ap[3] * Bp[1];
-    // C3[2] += Ap[3] * Bp[2];
-    // C3[3] += Ap[3] * Bp[3];
-    // C3[4] += Ap[3] * Bp[4];
-    // C3[5] += Ap[3] * Bp[5];
-    // C3[6] += Ap[3] * Bp[6];
-    // C3[7] += Ap[3] * Bp[7];
-
-    // C4[0] += Ap[4] * Bp[0];
-    // C4[1] += Ap[4] * Bp[1];
-    // C4[2] += Ap[4] * Bp[2];
-    // C4[3] += Ap[4] * Bp[3];
-    // C4[4] += Ap[4] * Bp[4];
-    // C4[5] += Ap[4] * Bp[5];
-    // C4[6] += Ap[4] * Bp[6];
-    // C4[7] += Ap[4] * Bp[7];
-
-    // C5[0] += Ap[5] * Bp[0];
-    // C5[1] += Ap[5] * Bp[1];
-    // C5[2] += Ap[5] * Bp[2];
-    // C5[3] += Ap[5] * Bp[3];
-    // C5[4] += Ap[5] * Bp[4];
-    // C5[5] += Ap[5] * Bp[5];
-    // C5[6] += Ap[5] * Bp[6];
-    // C5[7] += Ap[5] * Bp[7];
-
-    // C6[0] += Ap[6] * Bp[0];
-    // C6[1] += Ap[6] * Bp[1];
-    // C6[2] += Ap[6] * Bp[2];
-    // C6[3] += Ap[6] * Bp[3];
-    // C6[4] += Ap[6] * Bp[4];
-    // C6[5] += Ap[6] * Bp[5];
-    // C6[6] += Ap[6] * Bp[6];
-    // C6[7] += Ap[6] * Bp[7];
-
-    // C7[0] += Ap[7] * Bp[0];
-    // C7[1] += Ap[7] * Bp[1];
-    // C7[2] += Ap[7] * Bp[2];
-    // C7[3] += Ap[7] * Bp[3];
-    // C7[4] += Ap[7] * Bp[4];
-    // C7[5] += Ap[7] * Bp[5];
-    // C7[6] += Ap[7] * Bp[6];
-    // C7[7] += Ap[7] * Bp[7];
-    // }
-    // }
   }
 
   _mm256_store_pd(C0, c0_0);
