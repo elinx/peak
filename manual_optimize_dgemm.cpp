@@ -57,7 +57,7 @@ static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t 
 }
 
 template <uint32_t m_inner_bound, uint32_t n_inner_bound>
-static void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
+static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
                        uint32_t n_outer) {
   for (uint32_t m = 0; m < m_inner_bound; ++m) {
     for (uint32_t n = 0; n < n_inner_bound; ++n) {
@@ -65,6 +65,7 @@ static void WriteBackC(const double *Cc, double *C, uint32_t M, uint32_t N, uint
       uint32_t C_n = n_outer + n;
       if (C_m < M && C_n < N) {
         C[C_m * N + C_n] += Cc[m * n_inner_bound + n];
+        Cc[m * n_inner_bound + n] = 0;
       }
     }
   }
@@ -298,8 +299,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t TILE_W = 8;
   constexpr uint32_t TILE_K = 256;
 
-  constexpr uint32_t m_outer_step = TILE_H * 8;
-  constexpr uint32_t n_outer_step = TILE_W * 16;
+  constexpr uint32_t m_outer_step = TILE_H * 64;
+  constexpr uint32_t n_outer_step = TILE_W * 32;
   constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
@@ -328,7 +329,6 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
       for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
         PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
                                                           m_outer, k_outer);
-        memset(Cc, 0, sizeof(double) * m_inner_bound * n_inner_bound);
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
             micro_kernel_intrincs_4x8_butterfly_permutation<m_inner_step, n_inner_step,
