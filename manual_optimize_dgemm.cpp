@@ -28,6 +28,7 @@ static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t 
   for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
     for (uint32_t k = 0; k < k_inner_bound; ++k) {
       for (uint32_t n = 0; n < n_inner_step; ++n) {
+        // TODO: remove this branch
         if ((k + k_outer) < K && (nn + n_outer + n) < N) {
           *Bp++ = B[k * N + n];
         } else {
@@ -45,6 +46,7 @@ static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t 
   for (uint32_t mm = 0; mm < m_inner_bound; mm += m_inner_step) {
     for (uint32_t k = 0; k < k_inner_bound; ++k) {
       for (uint32_t m = 0; m < m_inner_step; ++m) {
+        // TODO: remove this branch
         if ((k + k_outer) < K && (mm + m_outer + m) < M) {
           *Ap++ = A[m * K + k];
         } else {
@@ -63,6 +65,7 @@ static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m
     for (uint32_t n = 0; n < n_inner_bound; ++n) {
       uint32_t C_m = m_outer + m;
       uint32_t C_n = n_outer + n;
+      // TODO: remove this branch
       if (C_m < M && C_n < N) {
         C[C_m * N + C_n] += Cc[m * n_inner_bound + n];
         Cc[m * n_inner_bound + n] = 0;
@@ -329,13 +332,17 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
       for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
         PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
                                                           m_outer, k_outer);
+        const double *Bcc = Bc;
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
+          const double *Acc = Ac;
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
             micro_kernel_intrincs_4x8_butterfly_permutation<m_inner_step, n_inner_step,
                                                             k_inner_bound, n_inner_bound>(
-                &Ac[m_inner * k_inner_bound], &Bc[n_inner * k_inner_bound],
-                &Cc[m_inner * n_inner_bound + n_inner]);
+                Acc, Bcc, &Cc[m_inner * n_inner_bound + n_inner]);
+            // TODO: pack Cc so that access Cc more cache friendly.
+            Acc += m_inner_step * k_inner_bound;
           }
+          Bcc += n_inner_step * k_inner_bound;
         }
         WriteBackC<m_inner_bound, n_inner_bound>(Cc, C, M, N, m_outer, n_outer);
       }
