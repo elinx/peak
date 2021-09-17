@@ -12,3 +12,7 @@ add_executable(naive-ijk naive_ijk.cpp)
 add_executable(manual manual_optimize_dgemm.cpp)
 add_executable(openblas openblas_dgemm.cpp)
 target_link_libraries(openblas "-lopenblas")
+
+find_package(Halide)
+add_executable(halide_reference halide_reference.cpp)
+target_link_libraries(halide_reference Halide::Halide "-lopenblas")
