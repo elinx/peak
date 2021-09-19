@@ -232,6 +232,74 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
 };
 
 template <uint32_t K>
+struct MicroKernel<4, 12, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
+  static constexpr uint32_t M = 4;
+  static constexpr uint32_t N = 12;
+  static inline void run(const double *A, const double *B, double *C) {
+    double *C0 = C;
+    double *C1 = C0 + N;
+    double *C2 = C1 + N;
+    double *C3 = C2 + N;
+
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(&C0[4]);
+    __m256d c0_2 = _mm256_load_pd(&C0[8]);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(&C1[4]);
+    __m256d c1_2 = _mm256_load_pd(&C1[8]);
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(&C2[4]);
+    __m256d c2_2 = _mm256_load_pd(&C2[8]);
+    __m256d c3_0 = _mm256_load_pd(C3);
+    __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    __m256d c3_2 = _mm256_load_pd(&C3[8]);
+
+    const double *Bp = B;
+    const double *Ap = A;
+    for (uint32_t k = 0; k < K; ++k) {
+      __m256d b0 = _mm256_load_pd(Bp);
+      __m256d b1 = _mm256_load_pd(Bp + 4);
+      __m256d b2 = _mm256_load_pd(Bp + 8);
+
+      __m256d a0 = _mm256_broadcast_sd(Ap);
+
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+      c0_2 = _mm256_fmadd_pd(a0, b2, c0_2);
+
+      a0 = _mm256_broadcast_sd(Ap + 1);
+      c1_0 = _mm256_fmadd_pd(a0, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a0, b1, c1_1);
+      c1_2 = _mm256_fmadd_pd(a0, b2, c1_2);
+
+      a0 = _mm256_broadcast_sd(Ap + 2);
+      c2_0 = _mm256_fmadd_pd(a0, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a0, b1, c2_1);
+      c2_2 = _mm256_fmadd_pd(a0, b2, c2_2);
+
+      a0 = _mm256_broadcast_sd(Ap + 3);
+      c3_0 = _mm256_fmadd_pd(a0, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a0, b1, c3_1);
+      c3_2 = _mm256_fmadd_pd(a0, b2, c3_2);
+      Bp += N;
+      Ap += M;
+    }
+
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(&C0[4], c0_1);
+    _mm256_store_pd(&C0[8], c0_2);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(&C1[4], c1_1);
+    _mm256_store_pd(&C1[8], c1_2);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(&C2[4], c2_1);
+    _mm256_store_pd(&C2[8], c2_2);
+    _mm256_store_pd(C3, c3_0);
+    _mm256_store_pd(&C3[4], c3_1);
+    _mm256_store_pd(&C3[8], c3_2);
+  }
+};
+template <uint32_t K>
 struct MicroKernel<3, 16, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
   static constexpr uint32_t M = 3;
   static constexpr uint32_t N = 16;
@@ -398,7 +466,7 @@ struct MicroKernel<8, 8, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntri
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
   constexpr uint32_t TILE_H = 4;
-  constexpr uint32_t TILE_W = 8;
+  constexpr uint32_t TILE_W = 12;
   constexpr uint32_t TILE_K = 256;
 
   constexpr uint32_t m_outer_step = TILE_H * 32;
