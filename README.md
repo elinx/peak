@@ -1,12 +1,15 @@
 # Introduction
+
 This project helps to explore your hardware and achieve the peak performance for your needs.
 
 # Enviroment
-* OS: ubuntu 20.04
-* Compiler: GCC 9.3.0
-    - optimization level: -O3
-* Platform: x86_x64
-* Hardware info:
+
+- OS: ubuntu 20.04
+- Compiler: GCC 9.3.0
+  - optimization level: -O3
+- Platform: x86_x64
+- Hardware info:
+
 ```
 Architecture:                    x86_64
 CPU op-mode(s):                  32-bit, 64-bit
@@ -43,9 +46,10 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
                                  opology cpuid pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch invpcid_single pti ssbd
                                  ibrs ibpb stibp fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves md_clear flush_l1d arch_capabilities
 ```
-* Miroarch: Coffee Lake (AVX2)
-    - registers: 16 x 256bit
-    - cache line size: 64bytes(8 FP64)
+
+- Miroarch: Coffee Lake (AVX2)
+  - registers: 16 x 256bit
+  - cache line size: 64bytes(8 FP64)
 
 ![coffee lake microarch](./images/skylake_block_diagram.svg)
 
@@ -68,10 +72,11 @@ for my hardware in single thread
 # Benchmarks
 
 ## Single Thread
-|Method|GFLOPS(FP64)|
-| :---: | :---: |
-| Theory|64|
-| MKL |56.971941|
-|OpenBlas|51.170771|
-|naive-ijk|1.960400|
-|manual|26.388053|
+
+|  Method   | GFLOPS(FP64) |
+| :-------: | :----------: |
+|  Theory   |      64      |
+|    MKL    |  56.971941   |
+| OpenBlas  |  51.170771   |
+| naive-ijk |   1.960400   |
+|  manual   |  31.438062   |
