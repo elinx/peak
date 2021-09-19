@@ -1,5 +1,8 @@
 {
-    "files.associations": {
-        "algorithm": "cpp"
-    }
+  "files.associations": {
+    "algorithm": "cpp"
+  },
+  "cmake.configureArgs": [
+    "-DCMAKE_PREFIX_PATH=/home/xilinxing/Downloads/Halide-12.0.1-x86-64-linux/lib/cmake/"
+  ]
 }
