@@ -76,227 +76,324 @@ static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m
   }
 }
 
-template <uint32_t M, uint32_t N, uint32_t K>
-static inline void micro_kernel(const double *A, const double *B, double *C) {
-  for (uint32_t k = 0; k < K; ++k) {
-    for (uint32_t m = 0; m < M; ++m) {
-      for (uint32_t n = 0; n < N; ++n) {
-        C[m * N + n] += A[k * M + m] * B[k * N + n];
+enum class MicroKernelType {
+  kBroadcast,
+  kButterflyPermunation,
+};
+
+enum class MicroKernelLang {
+  kCpp,
+  kIntrinsics,
+  kAssembly,
+};
+
+template <uint32_t M, uint32_t N, uint32_t K, MicroKernelType Type,
+          MicroKernelLang Lang = MicroKernelLang::kCpp>
+struct MicroKernel {
+  static inline void run(const double *A, const double *B, double *C) {
+    for (uint32_t k = 0; k < K; ++k) {
+      for (uint32_t m = 0; m < M; ++m) {
+        for (uint32_t n = 0; n < N; ++n) {
+          C[m * N + n] += A[k * M + m] * B[k * N + n];
+        }
       }
     }
   }
-}
+};
 
-template <uint32_t M, uint32_t N, uint32_t K>
-static inline void micro_kernel_intrincs_4x8(const double *A, const double *B, double *C) {
-  double *C0 = C;
-  double *C1 = C0 + N;
-  double *C2 = C1 + N;
-  double *C3 = C2 + N;
+template <uint32_t K>
+struct MicroKernel<4, 8, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
+  static constexpr uint32_t M = 4;
+  static constexpr uint32_t N = 8;
+  static inline void run(const double *A, const double *B, double *C) {
+    double *C0 = C;
+    double *C1 = C0 + N;
+    double *C2 = C1 + N;
+    double *C3 = C2 + N;
 
-  __m256d c0_0 = _mm256_load_pd(C0);
-  __m256d c0_1 = _mm256_load_pd(&C0[4]);
-  __m256d c1_0 = _mm256_load_pd(C1);
-  __m256d c1_1 = _mm256_load_pd(&C1[4]);
-  __m256d c2_0 = _mm256_load_pd(C2);
-  __m256d c2_1 = _mm256_load_pd(&C2[4]);
-  __m256d c3_0 = _mm256_load_pd(C3);
-  __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(&C0[4]);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(&C1[4]);
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(&C2[4]);
+    __m256d c3_0 = _mm256_load_pd(C3);
+    __m256d c3_1 = _mm256_load_pd(&C3[4]);
 
-  const double *Bp = B;
-  const double *Ap = A;
-  for (uint32_t k = 0; k < K; ++k) {
-    __m256d b0 = _mm256_load_pd(Bp);
-    __m256d b1 = _mm256_load_pd(Bp + 4);
+    const double *Bp = B;
+    const double *Ap = A;
+    for (uint32_t k = 0; k < K; ++k) {
+      __m256d b0 = _mm256_load_pd(Bp);
+      __m256d b1 = _mm256_load_pd(Bp + 4);
 
-    __m256d a0 = _mm256_broadcast_sd(Ap);
-    __m256d a1 = _mm256_broadcast_sd(Ap + 1);
-    __m256d a2 = _mm256_broadcast_sd(Ap + 2);
-    __m256d a3 = _mm256_broadcast_sd(Ap + 3);
+      __m256d a0 = _mm256_broadcast_sd(Ap);
+      __m256d a1 = _mm256_broadcast_sd(Ap + 1);
+      __m256d a2 = _mm256_broadcast_sd(Ap + 2);
+      __m256d a3 = _mm256_broadcast_sd(Ap + 3);
 
-    c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
-    c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
 
-    c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
-    c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
 
-    c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
-    c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
+      c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
 
-    c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
-    c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
-    Bp += N;
-    Ap += M;
+      c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
+      Bp += N;
+      Ap += M;
+    }
+
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(&C0[4], c0_1);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(&C1[4], c1_1);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(&C2[4], c2_1);
+    _mm256_store_pd(C3, c3_0);
+    _mm256_store_pd(&C3[4], c3_1);
   }
+};
 
-  _mm256_store_pd(C0, c0_0);
-  _mm256_store_pd(&C0[4], c0_1);
-  _mm256_store_pd(C1, c1_0);
-  _mm256_store_pd(&C1[4], c1_1);
-  _mm256_store_pd(C2, c2_0);
-  _mm256_store_pd(&C2[4], c2_1);
-  _mm256_store_pd(C3, c3_0);
-  _mm256_store_pd(&C3[4], c3_1);
-}
+template <uint32_t K>
+struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelLang::kIntrinsics> {
+  static constexpr uint32_t M = 4;
+  static constexpr uint32_t N = 8;
+  static inline void run(const double *A, const double *B, double *C) {
+    double *C0 = C;
+    double *C1 = C0 + N;
+    double *C2 = C1 + N;
+    double *C3 = C2 + N;
 
-template <uint32_t M, uint32_t N, uint32_t K>
-static inline void micro_kernel_intrincs_4x8_butterfly_permutation(const double *A, const double *B,
-                                                                   double *C) {
-  double *C0 = C;
-  double *C1 = C0 + N;
-  double *C2 = C1 + N;
-  double *C3 = C2 + N;
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(&C0[4]);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(&C1[4]);
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(&C2[4]);
+    __m256d c3_0 = _mm256_load_pd(C3);
+    __m256d c3_1 = _mm256_load_pd(&C3[4]);
 
-  __m256d c0_0 = _mm256_load_pd(C0);
-  __m256d c0_1 = _mm256_load_pd(&C0[4]);
-  __m256d c1_0 = _mm256_load_pd(C1);
-  __m256d c1_1 = _mm256_load_pd(&C1[4]);
-  __m256d c2_0 = _mm256_load_pd(C2);
-  __m256d c2_1 = _mm256_load_pd(&C2[4]);
-  __m256d c3_0 = _mm256_load_pd(C3);
-  __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    const double *Bp = B;
+    const double *Ap = A;
+    for (uint32_t k = 0; k < K; ++k) {
+      __m256d a0 = _mm256_load_pd(Ap);
+      __m256d b0 = _mm256_load_pd(Bp);
+      __m256d b1 = _mm256_load_pd(&Bp[4]);
 
-  const double *Bp = B;
-  const double *Ap = A;
-  for (uint32_t k = 0; k < K; ++k) {
-    __m256d a0 = _mm256_load_pd(Ap);
-    __m256d b0 = _mm256_load_pd(Bp);
-    __m256d b1 = _mm256_load_pd(&Bp[4]);
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
 
-    c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
-    c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+      a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+      c1_0 = _mm256_fmadd_pd(a0, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a0, b1, c1_1);
 
-    a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
-    c1_0 = _mm256_fmadd_pd(a0, b0, c1_0);
-    c1_1 = _mm256_fmadd_pd(a0, b1, c1_1);
+      a0 = _mm256_permute2f128_pd(a0, a0, 0x03);
+      c3_0 = _mm256_fmadd_pd(a0, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a0, b1, c3_1);
 
-    a0 = _mm256_permute2f128_pd(a0, a0, 0x03);
-    c3_0 = _mm256_fmadd_pd(a0, b0, c3_0);
-    c3_1 = _mm256_fmadd_pd(a0, b1, c3_1);
+      a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+      c2_0 = _mm256_fmadd_pd(a0, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a0, b1, c2_1);
+      Bp += N;
+      Ap += M;
+    }
+    __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
+    __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
+    __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
+    __m256d c3_0_semi = _mm256_shuffle_pd(c3_0, c2_0, 0b1010);
 
-    a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
-    c2_0 = _mm256_fmadd_pd(a0, b0, c2_0);
-    c2_1 = _mm256_fmadd_pd(a0, b1, c2_1);
-    Bp += N;
-    Ap += M;
+    __m256d c0_1_semi = _mm256_shuffle_pd(c0_1, c1_1, 0b1010);
+    __m256d c1_1_semi = _mm256_shuffle_pd(c1_1, c0_1, 0b1010);
+    __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
+    __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
+
+    c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
+    c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
+    c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
+    c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
+
+    c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
+    c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
+    c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
+    c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
+
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(&C0[4], c0_1);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(&C1[4], c1_1);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(&C2[4], c2_1);
+    _mm256_store_pd(C3, c3_0);
+    _mm256_store_pd(&C3[4], c3_1);
   }
-  __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
-  __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
-  __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
-  __m256d c3_0_semi = _mm256_shuffle_pd(c3_0, c2_0, 0b1010);
+};
 
-  __m256d c0_1_semi = _mm256_shuffle_pd(c0_1, c1_1, 0b1010);
-  __m256d c1_1_semi = _mm256_shuffle_pd(c1_1, c0_1, 0b1010);
-  __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
-  __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
+template <uint32_t K>
+struct MicroKernel<3, 16, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
+  static constexpr uint32_t M = 3;
+  static constexpr uint32_t N = 16;
+  static inline void run(const double *A, const double *B, double *C) {
+    const double *Ap = A;
+    const double *Bp = B;
+    double *C0 = C;
+    double *C1 = C + N;
+    double *C2 = C1 + N;
+    double a;
 
-  c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
-  c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
-  c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
-  c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(C0 + 4);
+    __m256d c0_2 = _mm256_load_pd(C0 + 8);
+    __m256d c0_3 = _mm256_load_pd(C0 + 12);
 
-  c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
-  c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
-  c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
-  c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(C1 + 4);
+    __m256d c1_2 = _mm256_load_pd(C1 + 8);
+    __m256d c1_3 = _mm256_load_pd(C1 + 12);
 
-  _mm256_store_pd(C0, c0_0);
-  _mm256_store_pd(&C0[4], c0_1);
-  _mm256_store_pd(C1, c1_0);
-  _mm256_store_pd(&C1[4], c1_1);
-  _mm256_store_pd(C2, c2_0);
-  _mm256_store_pd(&C2[4], c2_1);
-  _mm256_store_pd(C3, c3_0);
-  _mm256_store_pd(&C3[4], c3_1);
-}
-template <uint32_t M, uint32_t N, uint32_t K, uint32_t CN>
-static inline void micro_kernel_intrincs(const double *A, const double *B, double *C) {
-  double *C0 = C;
-  double *C1 = C0 + CN;
-  double *C2 = C1 + CN;
-  double *C3 = C2 + CN;
-  double *C4 = C3 + CN;
-  double *C5 = C4 + CN;
-  double *C6 = C5 + CN;
-  double *C7 = C6 + CN;
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(C2 + 4);
+    __m256d c2_2 = _mm256_load_pd(C2 + 8);
+    __m256d c2_3 = _mm256_load_pd(C2 + 12);
 
-  __m256d c0_0 = _mm256_load_pd(C0);
-  __m256d c0_1 = _mm256_load_pd(&C0[4]);
-  __m256d c1_0 = _mm256_load_pd(C1);
-  __m256d c1_1 = _mm256_load_pd(&C1[4]);
-  __m256d c2_0 = _mm256_load_pd(C2);
-  __m256d c2_1 = _mm256_load_pd(&C2[4]);
-  __m256d c3_0 = _mm256_load_pd(C3);
-  __m256d c3_1 = _mm256_load_pd(&C3[4]);
-  __m256d c4_0 = _mm256_load_pd(C4);
-  __m256d c4_1 = _mm256_load_pd(&C4[4]);
-  __m256d c5_0 = _mm256_load_pd(C5);
-  __m256d c5_1 = _mm256_load_pd(&C5[4]);
-  __m256d c6_0 = _mm256_load_pd(C6);
-  __m256d c6_1 = _mm256_load_pd(&C6[4]);
-  __m256d c7_0 = _mm256_load_pd(C7);
-  __m256d c7_1 = _mm256_load_pd(&C7[4]);
+    for (uint32_t k = 0; k < K; ++k) {
+      __m256d b0 = _mm256_load_pd(Bp);
+      __m256d b1 = _mm256_load_pd(Bp + 4);
+      __m256d b2 = _mm256_load_pd(Bp + 8);
+      __m256d b3 = _mm256_load_pd(Bp + 12);
 
-  for (uint32_t k = 0; k < K; ++k) {
-    // for (uint32_t m = 0; m < M; ++m) {  // M = 8
-    // for (uint32_t n = 0; n < N; ++n) { // N = 8
-    const double *Bp = &B[k * N];
-    const double *Ap = &A[k * M];
+      __m256d a = _mm256_broadcast_sd(Ap);
+      c0_0 = _mm256_fmadd_pd(a, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a, b1, c0_1);
+      c0_2 = _mm256_fmadd_pd(a, b2, c0_2);
+      c0_3 = _mm256_fmadd_pd(a, b3, c0_3);
 
-    __m256d b0 = _mm256_load_pd(Bp);
-    __m256d a1 = _mm256_broadcast_sd(&Ap[1]);
-    __m256d b1 = _mm256_load_pd(&Bp[4]);
-    __m256d a2 = _mm256_broadcast_sd(&Ap[2]);
+      a = _mm256_broadcast_sd(Ap + 1);
+      c1_0 = _mm256_fmadd_pd(a, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a, b1, c1_1);
+      c1_2 = _mm256_fmadd_pd(a, b2, c1_2);
+      c1_3 = _mm256_fmadd_pd(a, b3, c1_3);
 
-    __m256d a0 = _mm256_broadcast_sd(&Ap[0]);
+      a = _mm256_broadcast_sd(Ap + 2);
+      c2_0 = _mm256_fmadd_pd(a, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a, b1, c2_1);
+      c2_2 = _mm256_fmadd_pd(a, b2, c2_2);
+      c2_3 = _mm256_fmadd_pd(a, b3, c2_3);
+      Ap += M;
+      Bp += N;
+    }
 
-    c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
-    __m256d a3 = _mm256_broadcast_sd(&Ap[3]);
-    c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(C0 + 4, c0_1);
+    _mm256_store_pd(C0 + 8, c0_2);
+    _mm256_store_pd(C0 + 12, c0_3);
 
-    c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
-    __m256d a4 = _mm256_broadcast_sd(&Ap[4]);
-    c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(C1 + 4, c1_1);
+    _mm256_store_pd(C1 + 8, c1_2);
+    _mm256_store_pd(C1 + 12, c1_3);
 
-    c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
-    __m256d a5 = _mm256_broadcast_sd(&Ap[5]);
-    c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
-
-    c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
-    __m256d a6 = _mm256_broadcast_sd(&Ap[6]);
-    c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
-
-    c4_0 = _mm256_fmadd_pd(a4, b0, c4_0);
-    __m256d a7 = _mm256_broadcast_sd(&Ap[7]);
-    c4_1 = _mm256_fmadd_pd(a4, b1, c4_1);
-
-    c5_0 = _mm256_fmadd_pd(a5, b0, c5_0);
-    c5_1 = _mm256_fmadd_pd(a5, b1, c5_1);
-
-    c6_0 = _mm256_fmadd_pd(a6, b0, c6_0);
-    c6_1 = _mm256_fmadd_pd(a6, b1, c6_1);
-
-    c7_0 = _mm256_fmadd_pd(a7, b0, c7_0);
-    c7_1 = _mm256_fmadd_pd(a7, b1, c7_1);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(C2 + 4, c2_1);
+    _mm256_store_pd(C2 + 8, c2_2);
+    _mm256_store_pd(C2 + 12, c2_3);
   }
+};
 
-  _mm256_store_pd(C0, c0_0);
-  _mm256_store_pd(&C0[4], c0_1);
-  _mm256_store_pd(C1, c1_0);
-  _mm256_store_pd(&C1[4], c1_1);
-  _mm256_store_pd(C2, c2_0);
-  _mm256_store_pd(&C2[4], c2_1);
-  _mm256_store_pd(C3, c3_0);
-  _mm256_store_pd(&C3[4], c3_1);
-  _mm256_store_pd(C4, c4_0);
-  _mm256_store_pd(&C4[4], c4_1);
-  _mm256_store_pd(C5, c5_0);
-  _mm256_store_pd(&C5[4], c5_1);
-  _mm256_store_pd(C6, c6_0);
-  _mm256_store_pd(&C6[4], c6_1);
-  _mm256_store_pd(C7, c7_0);
-  _mm256_store_pd(&C7[4], c7_1);
-}
+template <uint32_t K>
+struct MicroKernel<8, 8, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
+  static constexpr uint32_t M = 8;
+  static constexpr uint32_t N = 8;
+  static inline void run(const double *A, const double *B, double *C) {
+    double *C0 = C;
+    double *C1 = C0 + N;
+    double *C2 = C1 + N;
+    double *C3 = C2 + N;
+    double *C4 = C3 + N;
+    double *C5 = C4 + N;
+    double *C6 = C5 + N;
+    double *C7 = C6 + N;
+
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(&C0[4]);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(&C1[4]);
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(&C2[4]);
+    __m256d c3_0 = _mm256_load_pd(C3);
+    __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    __m256d c4_0 = _mm256_load_pd(C4);
+    __m256d c4_1 = _mm256_load_pd(&C4[4]);
+    __m256d c5_0 = _mm256_load_pd(C5);
+    __m256d c5_1 = _mm256_load_pd(&C5[4]);
+    __m256d c6_0 = _mm256_load_pd(C6);
+    __m256d c6_1 = _mm256_load_pd(&C6[4]);
+    __m256d c7_0 = _mm256_load_pd(C7);
+    __m256d c7_1 = _mm256_load_pd(&C7[4]);
+
+    for (uint32_t k = 0; k < K; ++k) {
+      // for (uint32_t m = 0; m < M; ++m) {  // M = 8
+      // for (uint32_t n = 0; n < N; ++n) { // N = 8
+      const double *Bp = &B[k * N];
+      const double *Ap = &A[k * M];
+
+      __m256d b0 = _mm256_load_pd(Bp);
+      __m256d a1 = _mm256_broadcast_sd(&Ap[1]);
+      __m256d b1 = _mm256_load_pd(&Bp[4]);
+      __m256d a2 = _mm256_broadcast_sd(&Ap[2]);
+
+      __m256d a0 = _mm256_broadcast_sd(&Ap[0]);
+
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      __m256d a3 = _mm256_broadcast_sd(&Ap[3]);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      __m256d a4 = _mm256_broadcast_sd(&Ap[4]);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+      c2_0 = _mm256_fmadd_pd(a2, b0, c2_0);
+      __m256d a5 = _mm256_broadcast_sd(&Ap[5]);
+      c2_1 = _mm256_fmadd_pd(a2, b1, c2_1);
+
+      c3_0 = _mm256_fmadd_pd(a3, b0, c3_0);
+      __m256d a6 = _mm256_broadcast_sd(&Ap[6]);
+      c3_1 = _mm256_fmadd_pd(a3, b1, c3_1);
+
+      c4_0 = _mm256_fmadd_pd(a4, b0, c4_0);
+      __m256d a7 = _mm256_broadcast_sd(&Ap[7]);
+      c4_1 = _mm256_fmadd_pd(a4, b1, c4_1);
+
+      c5_0 = _mm256_fmadd_pd(a5, b0, c5_0);
+      c5_1 = _mm256_fmadd_pd(a5, b1, c5_1);
+
+      c6_0 = _mm256_fmadd_pd(a6, b0, c6_0);
+      c6_1 = _mm256_fmadd_pd(a6, b1, c6_1);
+
+      c7_0 = _mm256_fmadd_pd(a7, b0, c7_0);
+      c7_1 = _mm256_fmadd_pd(a7, b1, c7_1);
+    }
+
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(&C0[4], c0_1);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(&C1[4], c1_1);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(&C2[4], c2_1);
+    _mm256_store_pd(C3, c3_0);
+    _mm256_store_pd(&C3[4], c3_1);
+    _mm256_store_pd(C4, c4_0);
+    _mm256_store_pd(&C4[4], c4_1);
+    _mm256_store_pd(C5, c5_0);
+    _mm256_store_pd(&C5[4], c5_1);
+    _mm256_store_pd(C6, c6_0);
+    _mm256_store_pd(&C6[4], c6_1);
+    _mm256_store_pd(C7, c7_0);
+    _mm256_store_pd(&C7[4], c7_1);
+  }
+};
 
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
@@ -304,7 +401,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t TILE_W = 8;
   constexpr uint32_t TILE_K = 256;
 
-  constexpr uint32_t m_outer_step = TILE_H * 64;
+  constexpr uint32_t m_outer_step = TILE_H * 32;
   constexpr uint32_t n_outer_step = TILE_W * 32;
   constexpr uint32_t k_outer_step = TILE_K;
 
@@ -339,8 +436,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           const double *Acc = Ac;
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            micro_kernel_intrincs_4x8_butterfly_permutation<m_inner_step, n_inner_step,
-                                                            k_inner_bound>(Acc, Bcc, Ccc);
+            MicroKernel<m_inner_step, n_inner_step, k_inner_bound, MicroKernelType::kBroadcast,
+                        MicroKernelLang::kIntrinsics>::run(Acc, Bcc, Ccc);
             Acc += m_inner_step * k_inner_bound;
             Ccc += m_inner_step * n_inner_step;
           }
