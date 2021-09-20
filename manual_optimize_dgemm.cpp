@@ -40,6 +40,33 @@ static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t 
   }
 }
 
+// template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
+// static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
+//                   uint32_t n_outer) {
+//   for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
+//     for (uint32_t k = 0; k < k_inner_bound; ++k) {
+//       if ((k + k_outer) >= K) {
+//         memset(Bp, 0, n_inner_step * sizeof(double));
+//         Bp += n_inner_step;
+//         continue;
+//       }
+//       if ((nn + n_outer + n_inner_step) <= N) {
+//         memcpy(Bp, &B[k * N], n_inner_step * sizeof(double));
+//         Bp += n_inner_step;
+//         continue;
+//       }
+//       for (uint32_t n = 0; n < n_inner_step; ++n) {
+//         if ((nn + n_outer + n) < N) {
+//           *Bp++ = B[k * N + n];
+//         } else {
+//           *Bp++ = 0;
+//         }
+//       }
+//     }
+//     B += n_inner_step;
+//   }
+// }
+
 template <uint32_t m_inner_bound, uint32_t k_inner_bound, uint32_t m_inner_step>
 static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
                   uint32_t k_outer) {
