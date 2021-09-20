@@ -1,9 +1,9 @@
 #!/bin/bash
 
 H_START=4
-H_END=64
+H_END=128
 W_START=4
-W_END=64
+W_END=128
 STEP=4
 
 for ((h = $H_START; h <= $H_END; h += $STEP)); do
