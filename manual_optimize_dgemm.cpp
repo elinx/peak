@@ -321,6 +321,116 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
 };
 
 template <uint32_t K>
+struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelLang::kAssembly> {
+  static constexpr uint32_t M = 4;
+  static constexpr uint32_t N = 8;
+  static inline void run(const double *A, const double *B, double *C) {
+    double *C0 = C;
+    double *C1 = C0 + N;
+    double *C2 = C1 + N;
+    double *C3 = C2 + N;
+
+    __m256d c0_0 = _mm256_load_pd(C0);
+    __m256d c0_1 = _mm256_load_pd(&C0[4]);
+    __m256d c1_0 = _mm256_load_pd(C1);
+    __m256d c1_1 = _mm256_load_pd(&C1[4]);
+    __m256d c2_0 = _mm256_load_pd(C2);
+    __m256d c2_1 = _mm256_load_pd(&C2[4]);
+    __m256d c3_0 = _mm256_load_pd(C3);
+    __m256d c3_1 = _mm256_load_pd(&C3[4]);
+
+    const double *Bp = B;
+    const double *Ap = A;
+    __m256d a0 = _mm256_load_pd(Ap);
+    __m256d b0 = _mm256_load_pd(Bp);
+    __m256d b1 = _mm256_load_pd(Bp + 4);
+
+    __m256d A0, B0, B1;
+    __m256d a1, a2, a3, A1, A2, A3;
+
+    for (uint32_t k = 0; k < K; k += 2) {
+      __asm__ volatile("prefetcht0 192(%0)          \n\t" : : "r"(Bp));
+      B0 = _mm256_load_pd(Bp + 8);
+
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+      B1 = _mm256_load_pd(Bp + 12);
+      a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+      a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+      A0 = _mm256_load_pd(Ap + 4);
+
+      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
+
+      a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+
+      __asm__ volatile("prefetcht0 512(%0)          \n\t" : : "r"(Bp));
+
+      b0 = _mm256_load_pd(Bp + 16);
+      A1 = _mm256_permute4x64_pd(A0, _MM_SHUFFLE(2, 3, 0, 1));
+
+      c0_0 = _mm256_fmadd_pd(A0, B0, c0_0);
+      c0_1 = _mm256_fmadd_pd(A0, B1, c0_1);
+
+      A2 = _mm256_permute2f128_pd(A1, A1, 0x03);
+
+      c1_0 = _mm256_fmadd_pd(A1, B0, c1_0);
+      c1_1 = _mm256_fmadd_pd(A1, B1, c1_1);
+
+      b1 = _mm256_load_pd(Bp + 20);
+      A3 = _mm256_permute4x64_pd(A2, _MM_SHUFFLE(2, 3, 0, 1));
+
+      c3_0 = _mm256_fmadd_pd(A2, B0, c3_0);
+      c3_1 = _mm256_fmadd_pd(A2, B1, c3_1);
+
+      a0 = _mm256_load_pd(Ap + 8);
+
+      c2_0 = _mm256_fmadd_pd(A3, B0, c2_0);
+      c2_1 = _mm256_fmadd_pd(A3, B1, c2_1);
+
+      Bp += 2 * N;
+      Ap += 2 * M;
+    }
+
+    __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
+    __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
+    __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
+    __m256d c3_0_semi = _mm256_shuffle_pd(c3_0, c2_0, 0b1010);
+
+    __m256d c0_1_semi = _mm256_shuffle_pd(c0_1, c1_1, 0b1010);
+    __m256d c1_1_semi = _mm256_shuffle_pd(c1_1, c0_1, 0b1010);
+    __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
+    __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
+
+    c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
+    c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
+    c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
+    c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
+
+    c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
+    c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
+    c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
+    c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
+
+    _mm256_store_pd(C0, c0_0);
+    _mm256_store_pd(&C0[4], c0_1);
+    _mm256_store_pd(C1, c1_0);
+    _mm256_store_pd(&C1[4], c1_1);
+    _mm256_store_pd(C2, c2_0);
+    _mm256_store_pd(&C2[4], c2_1);
+    _mm256_store_pd(C3, c3_0);
+    _mm256_store_pd(&C3[4], c3_1);
+  }
+};
+
+template <uint32_t K>
 struct MicroKernel<4, 12, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntrinsics> {
   static constexpr uint32_t M = 4;
   static constexpr uint32_t N = 12;
