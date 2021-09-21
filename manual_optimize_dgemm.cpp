@@ -205,27 +205,89 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
 
     const double *Bp = B;
     const double *Ap = A;
-    for (uint32_t k = 0; k < K; ++k) {
+    for (uint32_t k = 0; k < K; k += 4) {
       __m256d a0 = _mm256_load_pd(Ap);
+
       __m256d b0 = _mm256_load_pd(Bp);
       __m256d b1 = _mm256_load_pd(&Bp[4]);
 
+      __m256d a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
       c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
       c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
 
-      a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
-      c1_0 = _mm256_fmadd_pd(a0, b0, c1_0);
-      c1_1 = _mm256_fmadd_pd(a0, b1, c1_1);
+      __m256d a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
 
-      a0 = _mm256_permute2f128_pd(a0, a0, 0x03);
-      c3_0 = _mm256_fmadd_pd(a0, b0, c3_0);
-      c3_1 = _mm256_fmadd_pd(a0, b1, c3_1);
+      __m256d a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
 
-      a0 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
-      c2_0 = _mm256_fmadd_pd(a0, b0, c2_0);
-      c2_1 = _mm256_fmadd_pd(a0, b1, c2_1);
-      Bp += N;
-      Ap += M;
+      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+
+      a0 = _mm256_load_pd(Ap + M);
+
+      b0 = _mm256_load_pd(Bp + N);
+      b1 = _mm256_load_pd(&Bp[N + 4]);
+
+      a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+      a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+      a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
+
+      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+
+      a0 = _mm256_load_pd(Ap + 2 * M);
+
+      b0 = _mm256_load_pd(Bp + 2 * N);
+      b1 = _mm256_load_pd(&Bp[2 * N + 4]);
+
+      a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+      a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+      a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
+
+      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+
+      a0 = _mm256_load_pd(Ap + 3 * M);
+
+      b0 = _mm256_load_pd(Bp + 3 * N);
+      b1 = _mm256_load_pd(&Bp[3 * N + 4]);
+
+      a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+
+      a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+
+      a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
+
+      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+
+      Bp += 4 * N;
+      Ap += 4 * M;
     }
     __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
     __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
@@ -493,11 +555,11 @@ struct MicroKernel<8, 8, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntri
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
   constexpr uint32_t TILE_H = 4;
-  constexpr uint32_t TILE_W = 12;
-  constexpr uint32_t TILE_K = 256;
+  constexpr uint32_t TILE_W = 8;
+  constexpr uint32_t TILE_K = 128;
 
-  constexpr uint32_t m_outer_step = TILE_H * 32;
-  constexpr uint32_t n_outer_step = TILE_W * 56;
+  constexpr uint32_t m_outer_step = TILE_H * 20;
+  constexpr uint32_t n_outer_step = TILE_W * 80;
   constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
@@ -513,6 +575,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   static_assert(!(n_inner_bound % n_inner_step));
   static_assert(!(m_inner_bound % m_inner_step));
+  static_assert(!(k_inner_bound % 2));
 
   double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
   double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
@@ -531,7 +594,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           const double *Acc = Ac;
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            MicroKernel<m_inner_step, n_inner_step, k_inner_bound, MicroKernelType::kBroadcast,
+            MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
+                        MicroKernelType::kButterflyPermunation,
                         MicroKernelLang::kIntrinsics>::run(Acc, Bcc, Ccc);
             Acc += m_inner_step * k_inner_bound;
             Ccc += m_inner_step * n_inner_step;
