@@ -664,8 +664,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t TILE_W = 8;
   constexpr uint32_t TILE_K = 640;
 
-  constexpr uint32_t m_outer_step = TILE_H * 4;
-  constexpr uint32_t n_outer_step = TILE_W * 80;
+  constexpr uint32_t m_outer_step = TILE_H * 160;
+  constexpr uint32_t n_outer_step = TILE_W * 4;
   constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
@@ -688,26 +688,23 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_step * n_inner_step);
   memset(C, 0, M * N * sizeof(double));
 
-  for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
-    for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
-      PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, &B[k_outer * N + n_outer], K, N,
-                                                        k_outer, n_outer);
-      for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
-        PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
-                                                          m_outer, k_outer);
-        const double *Bcc = Bc;
-        for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
-          const double *Acc = Ac;
-          for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
+  for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
+    for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
+      PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
+                                                        m_outer, k_outer);
+      for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
+        PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, &B[k_outer * N + n_outer], K, N,
+                                                          k_outer, n_outer);
+        for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
+          for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
             MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
                         MicroKernelType::kButterflyPermunation,
-                        MicroKernelLang::kIntrinsics>::run(Acc, Bcc, Cc);
-            Acc += m_inner_step * k_inner_bound;
+                        MicroKernelLang::kIntrinsics>::run(&Ac[m_inner * k_inner_bound],
+                                                           &Bc[n_inner * k_inner_bound], Cc);
             WriteBackC<m_inner_bound, n_inner_bound, m_inner_step, n_inner_step>(
                 Cc, &C[(m_outer + m_inner) * N + n_outer + n_inner], M, N, m_outer + m_inner,
                 n_outer + n_inner);
           }
-          Bcc += n_inner_step * k_inner_bound;
         }
       }
     }
