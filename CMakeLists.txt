@@ -11,7 +11,11 @@ target_link_libraries(mkl "-lmkl_intel_ilp64 -lmkl_sequential -lmkl_core")
 add_executable(naive-ijk naive_ijk.cpp)
 add_executable(manual manual_optimize_dgemm.cpp)
 add_executable(openblas openblas_dgemm.cpp)
-target_link_libraries(openblas "-lopenblas")
+
+add_library(lib_openblas STATIC IMPORTED)
+set_target_properties(lib_openblas PROPERTIES
+    IMPORTED_LOCATION "$ENV{HOME}/workspace/gemm/OpenBLAS/libopenblas_haswell-r0.3.17.dev.a")
+target_link_libraries(openblas lib_openblas)
 
 find_package(Halide)
 add_executable(halide_reference halide_reference.cpp)

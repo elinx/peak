@@ -782,6 +782,7 @@ int main() {
       "interface \n\n");
   manual_dgemm(A, B, C, m, n, k);
 
+#if 1
   for (i = 0; i < (m * n); i++) {
     if (abs(C[i] - CRef[i]) > 1e-4) {
       printf("error at %d\n", i);
@@ -817,6 +818,7 @@ int main() {
     }
     printf("\n");
   }
+#endif
 
   printf("\n Deallocating memory \n\n");
   free(A);
