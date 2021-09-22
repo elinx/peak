@@ -662,9 +662,9 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
                   const uint32_t K) {
   constexpr uint32_t TILE_H = 4;
   constexpr uint32_t TILE_W = 8;
-  constexpr uint32_t TILE_K = 320;
+  constexpr uint32_t TILE_K = 640;
 
-  constexpr uint32_t m_outer_step = TILE_H * 20;
+  constexpr uint32_t m_outer_step = TILE_H * 4;
   constexpr uint32_t n_outer_step = TILE_W * 80;
   constexpr uint32_t k_outer_step = TILE_K;
 
