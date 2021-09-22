@@ -89,16 +89,12 @@ template <uint32_t m_inner_bound, uint32_t n_inner_bound, uint32_t m_inner_step,
           uint32_t n_inner_step>
 static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
                        uint32_t n_outer) {
-  for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
-    for (uint32_t mm = 0; mm < m_inner_bound; mm += m_inner_step) {
-      for (uint32_t m = 0; m < m_inner_step; ++m) {
-        for (uint32_t n = 0; n < n_inner_step; ++n) {
-          if ((m_outer + mm + m) < M && (n_outer + nn + n) < N) {
-            C[(mm + m) * N + nn + n] += *Cc;
-          }
-          *Cc++ = 0;
-        }
+  for (uint32_t m = 0; m < m_inner_step; ++m) {
+    for (uint32_t n = 0; n < n_inner_step; ++n) {
+      if ((m_outer + m) < M && (n_outer + n) < N) {
+        C[(m)*N + n] += *Cc;
       }
+      Cc++;
     }
   }
 }
@@ -194,14 +190,14 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
     double *C2 = C1 + N;
     double *C3 = C2 + N;
 
-    __m256d c0_0 = _mm256_load_pd(C0);
-    __m256d c0_1 = _mm256_load_pd(&C0[4]);
-    __m256d c1_0 = _mm256_load_pd(C1);
-    __m256d c1_1 = _mm256_load_pd(&C1[4]);
-    __m256d c2_0 = _mm256_load_pd(C2);
-    __m256d c2_1 = _mm256_load_pd(&C2[4]);
-    __m256d c3_0 = _mm256_load_pd(C3);
-    __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    __m256d c0_0 = _mm256_setzero_pd();
+    __m256d c0_1 = _mm256_setzero_pd();
+    __m256d c1_0 = _mm256_setzero_pd();
+    __m256d c1_1 = _mm256_setzero_pd();
+    __m256d c2_0 = _mm256_setzero_pd();
+    __m256d c2_1 = _mm256_setzero_pd();
+    __m256d c3_0 = _mm256_setzero_pd();
+    __m256d c3_1 = _mm256_setzero_pd();
 
     const double *Bp = B;
     const double *Ap = A;
@@ -689,7 +685,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
   double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
-  double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * n_inner_bound);
+  double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_step * n_inner_step);
   memset(C, 0, M * N * sizeof(double));
 
   for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
@@ -700,20 +696,19 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
         PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
                                                           m_outer, k_outer);
         const double *Bcc = Bc;
-        double *Ccc = Cc;
         for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
           const double *Acc = Ac;
           for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
             MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
                         MicroKernelType::kButterflyPermunation,
-                        MicroKernelLang::kIntrinsics>::run(Acc, Bcc, Ccc);
+                        MicroKernelLang::kIntrinsics>::run(Acc, Bcc, Cc);
             Acc += m_inner_step * k_inner_bound;
-            Ccc += m_inner_step * n_inner_step;
+            WriteBackC<m_inner_bound, n_inner_bound, m_inner_step, n_inner_step>(
+                Cc, &C[(m_outer + m_inner) * N + n_outer + n_inner], M, N, m_outer + m_inner,
+                n_outer + n_inner);
           }
           Bcc += n_inner_step * k_inner_bound;
         }
-        WriteBackC<m_inner_bound, n_inner_bound, m_inner_step, n_inner_step>(
-            Cc, &C[m_outer * N + n_outer], M, N, m_outer, n_outer);
       }
     }
   }
