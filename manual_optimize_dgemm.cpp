@@ -11,6 +11,17 @@ constexpr uint32_t l1_cache_size = 192 * 1024;
 constexpr uint32_t l2_cache_size = 1536 * 1024;
 constexpr uint32_t l3_cache_size = 9 * 1024 * 1024;
 
+enum class MicroKernelType {
+  kBroadcast,
+  kButterflyPermunation,
+};
+
+enum class MicroKernelLang {
+  kCpp,
+  kIntrinsics,
+  kAssembly,
+};
+
 void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                  const uint32_t K) {
   for (uint32_t i = 0; i < M; i++) {
@@ -22,41 +33,14 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
   }
 }
 
-template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
-static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
-                  uint32_t n_outer) {
-  for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
-    for (uint32_t k = 0; k < k_inner_bound; ++k) {
-      for (uint32_t n = 0; n < n_inner_step; ++n) {
-        // TODO: remove this branch
-        if ((k + k_outer) < K && (nn + n_outer + n) < N) {
-          *Bp++ = B[k * N + n];
-        } else {
-          *Bp++ = 0;
-        }
-      }
-    }
-    B += n_inner_step;
-  }
-}
-
 // template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
 // static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
 //                   uint32_t n_outer) {
 //   for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
 //     for (uint32_t k = 0; k < k_inner_bound; ++k) {
-//       if ((k + k_outer) >= K) {
-//         memset(Bp, 0, n_inner_step * sizeof(double));
-//         Bp += n_inner_step;
-//         continue;
-//       }
-//       if ((nn + n_outer + n_inner_step) <= N) {
-//         memcpy(Bp, &B[k * N], n_inner_step * sizeof(double));
-//         Bp += n_inner_step;
-//         continue;
-//       }
 //       for (uint32_t n = 0; n < n_inner_step; ++n) {
-//         if ((nn + n_outer + n) < N) {
+//         // TODO: remove this branch
+//         if ((k + k_outer) < K && (nn + n_outer + n) < N) {
 //           *Bp++ = B[k * N + n];
 //         } else {
 //           *Bp++ = 0;
@@ -66,6 +50,35 @@ static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t 
 //     B += n_inner_step;
 //   }
 // }
+
+template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
+static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
+                  uint32_t n_outer) {
+  uint32_t k_size = std::min(k_inner_bound, K - k_outer);
+  uint32_t n_size = std::min(n_inner_bound, N - n_outer);
+  uint32_t k = 0;
+  for (; k < k_size; ++k) {
+    uint32_t n = 0;
+    for (; n <= (n_size - n_inner_step); n += n_inner_step) {
+      for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
+        Bp[n * k_inner_bound + k * n_inner_step + nn] = B[k * N + n + nn];
+      }
+    }
+    for (; n < n_size; ++n) {
+      uint32_t b = n / n_inner_step * n_inner_step * k_inner_bound;
+      uint32_t s = k * n_inner_step;
+      uint32_t p = n % n_inner_step;
+      Bp[b + s + p] = B[k * N + n];
+    }
+    for (; n < n_inner_bound; ++n) {
+      uint32_t b = n / n_inner_step * n_inner_step * k_inner_bound;
+      uint32_t s = k * n_inner_step;
+      uint32_t p = n % n_inner_step;
+      Bp[b + s + p] = 0;
+    }
+  }
+  memset((void *)&Bp[k * n_inner_bound], 0, (k_inner_bound - k) * n_inner_bound * sizeof(double));
+}
 
 template <uint32_t m_inner_bound, uint32_t k_inner_bound, uint32_t m_inner_step>
 static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
@@ -98,17 +111,6 @@ static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m
     }
   }
 }
-
-enum class MicroKernelType {
-  kBroadcast,
-  kButterflyPermunation,
-};
-
-enum class MicroKernelLang {
-  kCpp,
-  kIntrinsics,
-  kAssembly,
-};
 
 template <uint32_t M, uint32_t N, uint32_t K, MicroKernelType Type,
           MicroKernelLang Lang = MicroKernelLang::kCpp>
