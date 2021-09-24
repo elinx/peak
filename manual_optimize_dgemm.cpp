@@ -327,108 +327,202 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
   static constexpr uint32_t M = 4;
   static constexpr uint32_t N = 8;
   static inline void run(const double *A, const double *B, double *C) {
-    double *C0 = C;
-    double *C1 = C0 + N;
-    double *C2 = C1 + N;
-    double *C3 = C2 + N;
+    uint64_t k_iter = K / 2;
+    __asm__ volatile(
+        "\n\t"
+        "movq %0, %%rax\n\t"                    // A
+        "movq %1, %%rbx\n\t"                    // B
+        "movq %2, %%rcx\n\t"                    // C
+        "vxorpd %%ymm8, %%ymm8, %%ymm8\n\t"     // c0_0
+        "vxorpd %%ymm9, %%ymm9, %%ymm9\n\t"     // c0_1
+        "vxorpd %%ymm10, %%ymm10, %%ymm10\n\t"  // c1_0
+        "vxorpd %%ymm11, %%ymm11, %%ymm11\n\t"  // c1_1
+        "vxorpd %%ymm12, %%ymm12, %%ymm12\n\t"  // c2_0
+        "vxorpd %%ymm13, %%ymm13, %%ymm13\n\t"  // c2_1
+        "vxorpd %%ymm14, %%ymm14, %%ymm14\n\t"  // c3_0
+        "vxorpd %%ymm15, %%ymm15, %%ymm15\n\t"  // c3_1
+        "movq %3, %%rsi\n\t"
+        "vmovapd 0(%%rax), %%ymm0\n\t"    // [A] -> a0
+        "vmovapd 0(%%rbx), %%ymm1\n\t"    // [B] -> b0
+        "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+4] -> b1
+        ".loop.start.L1:\n\t"
+        "\n\t"
+        "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
+        "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
+        "vpermilpd $5, %%ymm0, %%ymm3\n\t"
+        "vfmadd231pd %%ymm3, %%ymm1, %%ymm10\n\t"  // c1_0 += a0 * b0
+        "vfmadd231pd %%ymm3, %%ymm2, %%ymm11\n\t"  // c1_1 += a0 * b1
+        "vperm2f128 $3, %%ymm3, %%ymm3, %%ymm0\n\t"
+        "vfmadd231pd %%ymm0, %%ymm1, %%ymm14\n\t"  // c2_0 += a0 * b0
+        "vfmadd231pd %%ymm0, %%ymm2, %%ymm15\n\t"  // c2_1 += a0 * b1
+        "vpermilpd $5, %%ymm0, %%ymm3\n\t"
+        "vfmadd231pd %%ymm3, %%ymm1, %%ymm12\n\t"  // c3_0 += a0 * b0
+        "vfmadd231pd %%ymm3, %%ymm2, %%ymm13\n\t"  // c3_1 += a0 * b1
+        "\n\t"
+        "addq $4*8, %%rax\n\t"                    // A += M
+        "addq $8*8, %%rbx\n\t"                    // B += N
+        "vmovapd 0(%%rax), %%ymm4\n\t"            // [A+4] -> a0'
+        "vmovapd 0(%%rbx), %%ymm5\n\t"            // [B+8] -> b0'
+        "vmovapd 4*8(%%rbx), %%ymm6\n\t"          // [B+12] -> b1'
+        "vfmadd231pd %%ymm4, %%ymm5, %%ymm8\n\t"  // c0_0 += a0 * b0
+        "vfmadd231pd %%ymm4, %%ymm6, %%ymm9\n\t"  // c0_1 += a0 * b1
+        "vpermilpd $5, %%ymm4, %%ymm7\n\t"
+        "vfmadd231pd %%ymm7, %%ymm5, %%ymm10\n\t"  // c1_0 += a0 * b0
+        "vfmadd231pd %%ymm7, %%ymm6, %%ymm11\n\t"  // c1_1 += a0 * b1
+        "vperm2f128 $3, %%ymm7, %%ymm7, %%ymm4\n\t"
+        "vfmadd231pd %%ymm4, %%ymm5, %%ymm14\n\t"  // c2_0 += a0 * b0
+        "vfmadd231pd %%ymm4, %%ymm6, %%ymm15\n\t"  // c2_1 += a0 * b1
+        "vpermilpd $5, %%ymm4, %%ymm7\n\t"
+        "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
+        "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
+        "\n\t"
+        "addq $4*8, %%rax\n\t"            // A += M
+        "addq $8*8, %%rbx\n\t"            // B += N
+        "vmovapd 0(%%rax), %%ymm0\n\t"    // [A+8] -> a0
+        "vmovapd 0(%%rbx), %%ymm1\n\t"    // [B+16] -> b0
+        "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+20] -> b1
+        "\n\t"
+        "decq %%rsi\n\t"
+        "jne .loop.start.L1"
+        "\n\t"
+        "vshufpd $10, %%ymm10, %%ymm8, %%ymm0\n\t"
+        "vshufpd $10, %%ymm8, %%ymm10, %%ymm1\n\t"
+        "vshufpd $10, %%ymm14, %%ymm12, %%ymm2\n\t"
+        "vshufpd $10, %%ymm12, %%ymm14, %%ymm3\n\t"
+        "vshufpd $10, %%ymm11, %%ymm9, %%ymm4\n\t"
+        "vshufpd $10, %%ymm9, %%ymm11, %%ymm5\n\t"
+        "vshufpd $10, %%ymm15, %%ymm13, %%ymm6\n\t"
+        "vshufpd $10, %%ymm13, %%ymm15, %%ymm7\n\t"
+        "\n\t"
+        "vperm2f128 $48, %%ymm2, %%ymm0, %%ymm8\n\t"
+        "vperm2f128 $48, %%ymm0, %%ymm2, %%ymm12\n\t"
+        "vperm2f128 $48, %%ymm3, %%ymm1, %%ymm10\n\t"
+        "vperm2f128 $48, %%ymm1, %%ymm3, %%ymm14\n\t"
+        "vperm2f128 $48, %%ymm6, %%ymm4, %%ymm9\n\t"
+        "vperm2f128 $48, %%ymm4, %%ymm6, %%ymm13\n\t"
+        "vperm2f128 $48, %%ymm7, %%ymm5, %%ymm11\n\t"
+        "vperm2f128 $48, %%ymm5, %%ymm7, %%ymm15\n\t"
+        "\n\t"
+        "vmovapd %%ymm8, (%%rcx)\n\t"
+        "vmovapd %%ymm9, 32(%%rcx)\n\t"
+        "vmovapd %%ymm10, 64(%%rcx)\n\t"
+        "vmovapd %%ymm11, 96(%%rcx)\n\t"
+        "vmovapd %%ymm12, 128(%%rcx)\n\t"
+        "vmovapd %%ymm13, 160(%%rcx)\n\t"
+        "vmovapd %%ymm14, 192(%%rcx)\n\t"
+        "vmovapd %%ymm15, 224(%%rcx)\n\t"
+        "\n\t"
+        :            // output operands(none)
+        :            // input operands
+        "m"(A),      // 0
+        "m"(B),      // 1
+        "m"(C),      // 2
+        "m"(k_iter)  // 3
+        :            // register clobber list
+        "rax", "rbx", "rcx", "rsi", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
+        "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15");
+    // double *C0 = C;
+    // double *C1 = C0 + N;
+    // double *C2 = C1 + N;
+    // double *C3 = C2 + N;
 
-    __m256d c0_0 = _mm256_load_pd(C0);
-    __m256d c0_1 = _mm256_load_pd(&C0[4]);
-    __m256d c1_0 = _mm256_load_pd(C1);
-    __m256d c1_1 = _mm256_load_pd(&C1[4]);
-    __m256d c2_0 = _mm256_load_pd(C2);
-    __m256d c2_1 = _mm256_load_pd(&C2[4]);
-    __m256d c3_0 = _mm256_load_pd(C3);
-    __m256d c3_1 = _mm256_load_pd(&C3[4]);
+    // __m256d c0_0 = _mm256_setzero_pd();
+    // __m256d c0_1 = _mm256_setzero_pd();
+    // __m256d c1_0 = _mm256_setzero_pd();
+    // __m256d c1_1 = _mm256_setzero_pd();
+    // __m256d c2_0 = _mm256_setzero_pd();
+    // __m256d c2_1 = _mm256_setzero_pd();
+    // __m256d c3_0 = _mm256_setzero_pd();
+    // __m256d c3_1 = _mm256_setzero_pd();
 
-    const double *Bp = B;
-    const double *Ap = A;
-    __m256d a0 = _mm256_load_pd(Ap);
-    __m256d b0 = _mm256_load_pd(Bp);
-    __m256d b1 = _mm256_load_pd(Bp + 4);
+    // const double *Bp = B;
+    // const double *Ap = A;
+    // __m256d a0 = _mm256_load_pd(Ap);
+    // __m256d b0 = _mm256_load_pd(Bp);
+    // __m256d b1 = _mm256_load_pd(Bp + 4);
 
-    __m256d A0, B0, B1;
-    __m256d a1, a2, a3, A1, A2, A3;
+    // __m256d A0, B0, B1;
+    // __m256d a1, a2, a3, A1, A2, A3;
 
-    for (uint32_t k = 0; k < K; k += 2) {
-      __asm__ volatile("prefetcht0 192(%0)          \n\t" : : "r"(Bp));
-      B0 = _mm256_load_pd(Bp + 8);
+    // for (uint32_t k = 0; k < K; k += 2) {
+    //   __asm__ volatile("prefetcht0 192(%0)          \n\t" : : "r"(Bp));
+    //   B0 = _mm256_load_pd(Bp + 8);
 
-      c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
-      c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
+    //   c0_0 = _mm256_fmadd_pd(a0, b0, c0_0);
+    //   c0_1 = _mm256_fmadd_pd(a0, b1, c0_1);
 
-      B1 = _mm256_load_pd(Bp + 12);
-      a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
+    //   B1 = _mm256_load_pd(Bp + 12);
+    //   a1 = _mm256_permute4x64_pd(a0, _MM_SHUFFLE(2, 3, 0, 1));
 
-      c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
-      c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
+    //   c1_0 = _mm256_fmadd_pd(a1, b0, c1_0);
+    //   c1_1 = _mm256_fmadd_pd(a1, b1, c1_1);
 
-      a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
-      A0 = _mm256_load_pd(Ap + 4);
+    //   a2 = _mm256_permute2f128_pd(a1, a1, 0x03);
+    //   A0 = _mm256_load_pd(Ap + 4);
 
-      c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
-      c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
+    //   c3_0 = _mm256_fmadd_pd(a2, b0, c3_0);
+    //   c3_1 = _mm256_fmadd_pd(a2, b1, c3_1);
 
-      a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
-      c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
-      c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
+    //   a3 = _mm256_permute4x64_pd(a2, _MM_SHUFFLE(2, 3, 0, 1));
+    //   c2_0 = _mm256_fmadd_pd(a3, b0, c2_0);
+    //   c2_1 = _mm256_fmadd_pd(a3, b1, c2_1);
 
-      __asm__ volatile("prefetcht0 512(%0)          \n\t" : : "r"(Bp));
+    //   __asm__ volatile("prefetcht0 512(%0)          \n\t" : : "r"(Bp));
 
-      b0 = _mm256_load_pd(Bp + 16);
-      A1 = _mm256_permute4x64_pd(A0, _MM_SHUFFLE(2, 3, 0, 1));
+    //   b0 = _mm256_load_pd(Bp + 16);
+    //   A1 = _mm256_permute4x64_pd(A0, _MM_SHUFFLE(2, 3, 0, 1));
 
-      c0_0 = _mm256_fmadd_pd(A0, B0, c0_0);
-      c0_1 = _mm256_fmadd_pd(A0, B1, c0_1);
+    //   c0_0 = _mm256_fmadd_pd(A0, B0, c0_0);
+    //   c0_1 = _mm256_fmadd_pd(A0, B1, c0_1);
 
-      A2 = _mm256_permute2f128_pd(A1, A1, 0x03);
+    //   A2 = _mm256_permute2f128_pd(A1, A1, 0x03);
 
-      c1_0 = _mm256_fmadd_pd(A1, B0, c1_0);
-      c1_1 = _mm256_fmadd_pd(A1, B1, c1_1);
+    //   c1_0 = _mm256_fmadd_pd(A1, B0, c1_0);
+    //   c1_1 = _mm256_fmadd_pd(A1, B1, c1_1);
 
-      b1 = _mm256_load_pd(Bp + 20);
-      A3 = _mm256_permute4x64_pd(A2, _MM_SHUFFLE(2, 3, 0, 1));
+    //   b1 = _mm256_load_pd(Bp + 20);
+    //   A3 = _mm256_permute4x64_pd(A2, _MM_SHUFFLE(2, 3, 0, 1));
 
-      c3_0 = _mm256_fmadd_pd(A2, B0, c3_0);
-      c3_1 = _mm256_fmadd_pd(A2, B1, c3_1);
+    //   c3_0 = _mm256_fmadd_pd(A2, B0, c3_0);
+    //   c3_1 = _mm256_fmadd_pd(A2, B1, c3_1);
 
-      a0 = _mm256_load_pd(Ap + 8);
+    //   a0 = _mm256_load_pd(Ap + 8);
 
-      c2_0 = _mm256_fmadd_pd(A3, B0, c2_0);
-      c2_1 = _mm256_fmadd_pd(A3, B1, c2_1);
+    //   c2_0 = _mm256_fmadd_pd(A3, B0, c2_0);
+    //   c2_1 = _mm256_fmadd_pd(A3, B1, c2_1);
 
-      Bp += 2 * N;
-      Ap += 2 * M;
-    }
+    //   Bp += 2 * N;
+    //   Ap += 2 * M;
+    // }
 
-    __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
-    __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
-    __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
-    __m256d c3_0_semi = _mm256_shuffle_pd(c3_0, c2_0, 0b1010);
+    // __m256d c0_0_semi = _mm256_shuffle_pd(c0_0, c1_0, 0b1010);
+    // __m256d c1_0_semi = _mm256_shuffle_pd(c1_0, c0_0, 0b1010);
+    // __m256d c2_0_semi = _mm256_shuffle_pd(c2_0, c3_0, 0b1010);
+    // __m256d c3_0_semi = _mm256_shuffle_pd(c3_0, c2_0, 0b1010);
 
-    __m256d c0_1_semi = _mm256_shuffle_pd(c0_1, c1_1, 0b1010);
-    __m256d c1_1_semi = _mm256_shuffle_pd(c1_1, c0_1, 0b1010);
-    __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
-    __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
+    // __m256d c0_1_semi = _mm256_shuffle_pd(c0_1, c1_1, 0b1010);
+    // __m256d c1_1_semi = _mm256_shuffle_pd(c1_1, c0_1, 0b1010);
+    // __m256d c2_1_semi = _mm256_shuffle_pd(c2_1, c3_1, 0b1010);
+    // __m256d c3_1_semi = _mm256_shuffle_pd(c3_1, c2_1, 0b1010);
 
-    c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
-    c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
-    c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
-    c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
+    // c0_0 = _mm256_permute2f128_pd(c0_0_semi, c2_0_semi, 0x30);
+    // c2_0 = _mm256_permute2f128_pd(c2_0_semi, c0_0_semi, 0x30);
+    // c1_0 = _mm256_permute2f128_pd(c1_0_semi, c3_0_semi, 0x30);
+    // c3_0 = _mm256_permute2f128_pd(c3_0_semi, c1_0_semi, 0x30);
 
-    c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
-    c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
-    c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
-    c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
+    // c0_1 = _mm256_permute2f128_pd(c0_1_semi, c2_1_semi, 0x30);
+    // c2_1 = _mm256_permute2f128_pd(c2_1_semi, c0_1_semi, 0x30);
+    // c1_1 = _mm256_permute2f128_pd(c1_1_semi, c3_1_semi, 0x30);
+    // c3_1 = _mm256_permute2f128_pd(c3_1_semi, c1_1_semi, 0x30);
 
-    _mm256_store_pd(C0, c0_0);
-    _mm256_store_pd(&C0[4], c0_1);
-    _mm256_store_pd(C1, c1_0);
-    _mm256_store_pd(&C1[4], c1_1);
-    _mm256_store_pd(C2, c2_0);
-    _mm256_store_pd(&C2[4], c2_1);
-    _mm256_store_pd(C3, c3_0);
-    _mm256_store_pd(&C3[4], c3_1);
+    // _mm256_store_pd(C0, c0_0);
+    // _mm256_store_pd(&C0[4], c0_1);
+    // _mm256_store_pd(C1, c1_0);
+    // _mm256_store_pd(&C1[4], c1_1);
+    // _mm256_store_pd(C2, c2_0);
+    // _mm256_store_pd(&C2[4], c2_1);
+    // _mm256_store_pd(C3, c3_0);
+    // _mm256_store_pd(&C3[4], c3_1);
   }
 };
 
@@ -705,8 +799,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
           for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
             MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
                         MicroKernelType::kButterflyPermunation,
-                        MicroKernelLang::kIntrinsics>::run(&Ac[m_inner * k_inner_bound],
-                                                           &Bc[n_inner * k_inner_bound], Cc);
+                        MicroKernelLang::kAssembly>::run(&Ac[m_inner * k_inner_bound],
+                                                         &Bc[n_inner * k_inner_bound], Cc);
             WriteBackC<m_inner_bound, n_inner_bound, m_inner_step, n_inner_step>(
                 Cc, &C[(m_outer + m_inner) * N + n_outer + n_inner], M, N, m_outer + m_inner,
                 n_outer + n_inner);
