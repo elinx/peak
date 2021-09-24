@@ -3,7 +3,7 @@ project(peak CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
-add_definitions("-mavx2 -march=native")
+add_definitions("-mavx2 -march=native -O")
 
 add_executable(mkl mkl_dgemm.cpp)
 target_link_libraries(mkl "-lmkl_intel_ilp64 -lmkl_sequential -lmkl_core")

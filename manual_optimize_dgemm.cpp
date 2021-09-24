@@ -60,9 +60,13 @@ static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t 
   for (; k < k_size; ++k) {
     uint32_t n = 0;
     for (; n <= (n_size - n_inner_step); n += n_inner_step) {
-      for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
-        Bp[n * k_inner_bound + k * n_inner_step + nn] = B[k * N + n + nn];
-      }
+      __m256d v1 = _mm256_load_pd(&B[k * N + n]);
+      __m256d v2 = _mm256_load_pd(&B[k * N + n + 4]);
+      _mm256_store_pd(&Bp[n * k_inner_bound + k * n_inner_step], v1);
+      _mm256_store_pd(&Bp[n * k_inner_bound + k * n_inner_step + 4], v2);
+      // for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
+      //   Bp[n * k_inner_bound + k * n_inner_step + nn] = B[k * N + n + nn];
+      // }
     }
     for (; n < n_size; ++n) {
       uint32_t b = n / n_inner_step * n_inner_step * k_inner_bound;
@@ -740,9 +744,9 @@ int main() {
       "better "
       "\n"
       " performance \n\n");
-  A = (double *)malloc(m * k * sizeof(double));
-  B = (double *)malloc(k * n * sizeof(double));
-  C = (double *)malloc(m * n * sizeof(double));
+  A = (double *)aligned_alloc(32, m * k * sizeof(double));
+  B = (double *)aligned_alloc(32, k * n * sizeof(double));
+  C = (double *)aligned_alloc(32, m * n * sizeof(double));
   CRef = (double *)malloc(m * n * sizeof(double));
 
   if (A == NULL || B == NULL || C == NULL || CRef == NULL) {
