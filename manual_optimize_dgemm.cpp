@@ -347,40 +347,42 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+4] -> b1
         ".loop.start.L1:\n\t"
         "\n\t"
+        "prefetcht0 192(%%rax)\n\t"
+        "prefetcht0 384(%%rbx)\n\t"
+        "addq $4*8, %%rax\n\t"                    // A += M
+        "addq $8*8, %%rbx\n\t"                    // B += N
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
+        "vmovapd 0(%%rax), %%ymm4\n\t"             // [A+4] -> a0'
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm11\n\t"  // c1_1 += a0 * b1
         "vperm2f128 $3, %%ymm3, %%ymm3, %%ymm0\n\t"
+        "vmovapd 0(%%rbx), %%ymm5\n\t"             // [B+8] -> b0'
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm15\n\t"  // c2_1 += a0 * b1
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
+        "vmovapd 4*8(%%rbx), %%ymm6\n\t"           // [B+12] -> b1'
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
         "addq $4*8, %%rax\n\t"                    // A += M
         "addq $8*8, %%rbx\n\t"                    // B += N
-        "vmovapd 0(%%rax), %%ymm4\n\t"            // [A+4] -> a0'
-        "vmovapd 0(%%rbx), %%ymm5\n\t"            // [B+8] -> b0'
-        "vmovapd 4*8(%%rbx), %%ymm6\n\t"          // [B+12] -> b1'
         "vfmadd231pd %%ymm4, %%ymm5, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm4, %%ymm6, %%ymm9\n\t"  // c0_1 += a0 * b1
         "vpermilpd $5, %%ymm4, %%ymm7\n\t"
+        "vmovapd 0(%%rax), %%ymm0\n\t"             // [A+8] -> a0
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm11\n\t"  // c1_1 += a0 * b1
         "vperm2f128 $3, %%ymm7, %%ymm7, %%ymm4\n\t"
+        "vmovapd 0(%%rbx), %%ymm1\n\t"             // [B+16] -> b0
         "vfmadd231pd %%ymm4, %%ymm5, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm4, %%ymm6, %%ymm15\n\t"  // c2_1 += a0 * b1
         "vpermilpd $5, %%ymm4, %%ymm7\n\t"
+        "vmovapd 4*8(%%rbx), %%ymm2\n\t"           // [B+20] -> b1
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
-        "addq $4*8, %%rax\n\t"            // A += M
-        "addq $8*8, %%rbx\n\t"            // B += N
-        "vmovapd 0(%%rax), %%ymm0\n\t"    // [A+8] -> a0
-        "vmovapd 0(%%rbx), %%ymm1\n\t"    // [B+16] -> b0
-        "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+20] -> b1
         "\n\t"
         "decq %%rsi\n\t"
         "jne .loop.start.L1"
