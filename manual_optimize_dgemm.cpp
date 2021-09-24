@@ -347,8 +347,8 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+4] -> b1
         ".loop.start.L1:\n\t"
         "\n\t"
-        "prefetcht0 128(%%rax)\n\t"
-        "prefetcht0 256(%%rbx)\n\t"
+        "prefetcht0 192(%%rax)\n\t"
+        "prefetcht0 384(%%rbx)\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"

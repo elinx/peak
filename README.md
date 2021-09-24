@@ -48,8 +48,22 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
 ```
 
 - Miroarch: Coffee Lake (AVX2)
+
   - registers: 16 x 256bit
   - cache line size: 64bytes(8 FP64)
+
+- Instruction Timing
+
+  |       Intrinsics        | Instruction | Latency | Throughput |
+  | :---------------------: | :---------: | :-----: | :--------: |
+  |     \_mm256_load_pd     |   vmovapd   |    7    |    0.5     |
+  |    \_mm256_store_pd     |   vmovapd   |    5    |     1      |
+  |    \_mm256_fmadd_pd     | vfmadd213pd |    4    |    0.5     |
+  | \_mm256_permute4x64_pd  |   vpermpd   |    3    |     1      |
+  | \_mm256_permute2f128_pd | vperm2f128  |    3    |     1      |
+  |   \_mm256_shuffle_pd    |   vshufpd   |    1    |     1      |
+
+- Coffee Lake microarch
 
 ![coffee lake microarch](./images/skylake_block_diagram.svg)
 
