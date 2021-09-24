@@ -788,7 +788,11 @@ int main() {
     }
   }
 
-  manual_dgemm(A, B, C, m, n, k);
+  uint32_t warmup = 100;
+  while (warmup != 0) {
+    manual_dgemm(A, B, C, m, n, k);
+    warmup--;
+  }
   printf("\n Computations completed.\n\n");
   double elapsed = 1e6 * Halide::Tools::benchmark([&]() { manual_dgemm(A, B, C, m, n, k); });
   printf("time(us): %f, gflops: %f\n", elapsed, m * n * k * 2 * 1e-3 / elapsed);
