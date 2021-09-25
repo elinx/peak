@@ -795,7 +795,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t TILE_K = 320;
 
   constexpr uint32_t m_outer_step = TILE_H * 160;
-  constexpr uint32_t n_outer_step = TILE_W * 4;
+  constexpr uint32_t n_outer_step = TILE_W * 5;
   constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
@@ -811,12 +811,11 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
 
   static_assert(!(n_inner_bound % n_inner_step));
   static_assert(!(m_inner_bound % m_inner_step));
-  static_assert(!(k_inner_bound % 2));
+  static_assert(!(k_inner_bound % 4));
 
   double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
   double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
   double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_step * n_inner_step);
-  memset(C, 0, M * N * sizeof(double));
 
   for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
     for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
@@ -897,7 +896,7 @@ int main() {
   }
 
   set_math_flags();
-#define PROFILING 0
+#define PROFILING 1
 #if !PROFILING
   naive_dgemm(A, B, CRef, m, n, k);
 #endif
