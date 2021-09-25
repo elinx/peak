@@ -83,6 +83,30 @@ for my hardware in single thread
 1 * 4 * 2 * 2 * (256/64) = 64
 ```
 
+# Memory Schedule
+
+|               |  Shape   | Memory  | Memory(Readable) |
+| :-----------: | :------: | :-----: | :--------------: |
+| L1 Cache Size |          | 196608  |      192 KB      |
+| L2 Cache Size |          | 1572864 |      1.5 MB      |
+| L3 Cache Size |          | 9437184 |       9 MB       |
+|       M       |   640    |         |                  |
+|       N       |   640    |         |                  |
+|       K       |   640    |         |                  |
+|      MR       |    4     |         |                  |
+|      NR       |    8     |         |                  |
+|      KC       |   320    |         |                  |
+|      MC       |   640    |         |                  |
+|      NC       |    40    |         |                  |
+|       A       |  (M, K)  | 3276800 |     3.125 MB     |
+|       B       |  (K, N)  | 3276800 |     3.125 MB     |
+|       C       |  (M, N)  | 3276800 |     3.125 MB     |
+|      Ac       | (MC, KC) | 1638400 |    1.5625 MB     |
+|      Bc       | (KC, NC) | 102400  |      100 KB      |
+|   Ac-Slice    | (MR, KC) |  10240  |      10 KB       |
+|   Bc-Slice    | (KC, NR) |  20480  |      20 KB       |
+|      Cc       | (MR, NR) |   256   |      256 B       |
+
 # Benchmarks
 
 ## Single Thread
