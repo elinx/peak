@@ -379,7 +379,7 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
-        "prefetcht0 192(%%rbx)\n\t"
+        "prefetcht0 384(%%rbx)\n\t"
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
@@ -824,8 +824,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
       for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
         PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, &B[k_outer * N + n_outer], K, N,
                                                           k_outer, n_outer);
-        for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-          for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
+        for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
+          for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
             MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
                         MicroKernelType::kButterflyPermunation,
                         MicroKernelLang::kAssembly>::run(&Ac[m_inner * k_inner_bound],
@@ -896,7 +896,7 @@ int main() {
   }
 
   set_math_flags();
-#define PROFILING 1
+#define PROFILING 0
 #if !PROFILING
   naive_dgemm(A, B, CRef, m, n, k);
 #endif
