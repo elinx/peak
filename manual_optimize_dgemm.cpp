@@ -347,8 +347,8 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+4] -> b1
         ".loop.start.L1:\n\t"
         "\n\t"
-        "prefetcht0 4*64(%%rax)\n\t"
-        "prefetcht0 8*64(%%rbx)\n\t"
+        "prefetcht0 128(%%rax)\n\t"
+        "prefetcht0 192(%%rbx)\n\t"
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
@@ -379,6 +379,7 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
+        "prefetcht0 192(%%rbx)\n\t"
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
@@ -896,14 +897,25 @@ int main() {
   }
 
   set_math_flags();
+#define PROFILING 0
+#if !PROFILING
   naive_dgemm(A, B, CRef, m, n, k);
+#endif
 
   printf(
       " Computing matrix product using Intel(R) MKL dgemm function via CBLAS "
       "interface \n\n");
-  manual_dgemm(A, B, C, m, n, k);
+#if PROFILING
+  uint32_t warmup = 100;
+  while (warmup != 0) {
+#endif
+    manual_dgemm(A, B, C, m, n, k);
+#if PROFILING
+    warmup--;
+  }
+#endif
 
-#if 1
+#if !PROFILING
   for (i = 0; i < (m * n); i++) {
     if (abs(C[i] - CRef[i]) > 1e-4) {
       printf("error at %d\n", i);
