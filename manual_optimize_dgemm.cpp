@@ -331,7 +331,7 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
     __asm__ volatile(
         "\n\t"
         "movq %0, %%rax\n\t"                    // A
-        "movq %1, %%rbx\n\t"                    // B
+        "movq %1, %%rdx\n\t"                    // B
         "movq %2, %%rcx\n\t"                    // C
         "vxorpd %%ymm8, %%ymm8, %%ymm8\n\t"     // c0_0
         "vxorpd %%ymm9, %%ymm9, %%ymm9\n\t"     // c0_1
@@ -343,12 +343,14 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vxorpd %%ymm15, %%ymm15, %%ymm15\n\t"  // c3_1
         "movq %3, %%rsi\n\t"
         "vmovapd 0(%%rax), %%ymm0\n\t"    // [A] -> a0
-        "vmovapd 0(%%rbx), %%ymm1\n\t"    // [B] -> b0
-        "vmovapd 4*8(%%rbx), %%ymm2\n\t"  // [B+4] -> b1
+        "vmovapd 0(%%rdx), %%ymm1\n\t"    // [B] -> b0
+        "vmovapd 4*8(%%rdx), %%ymm2\n\t"  // [B+4] -> b1
+        "movl $111,%%ebx\n\t"             // IACA/OSACA START MARKER
+        ".byte 100,103,144\n\t"
         ".loop.start.L1:\n\t"
         "\n\t"
         "prefetcht0 128(%%rax)\n\t"
-        "prefetcht0 192(%%rbx)\n\t"
+        "prefetcht0 192(%%rdx)\n\t"
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
@@ -356,11 +358,11 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vperm2f128 $3, %%ymm3, %%ymm3, %%ymm0\n\t"
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm11\n\t"  // c1_1 += a0 * b1
-        "vmovapd 64(%%rbx), %%ymm5\n\t"            // [B+8] -> b0'
+        "vmovapd 64(%%rdx), %%ymm5\n\t"            // [B+8] -> b0'
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm15\n\t"  // c2_1 += a0 * b1
-        "vmovapd 96(%%rbx), %%ymm6\n\t"            // [B+12] -> b1'
+        "vmovapd 96(%%rdx), %%ymm6\n\t"            // [B+12] -> b1'
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
@@ -371,15 +373,15 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vperm2f128 $3, %%ymm7, %%ymm7, %%ymm4\n\t"
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm11\n\t"  // c1_1 += a0 * b1
-        "vmovapd 128(%%rbx), %%ymm1\n\t"           // [B+16] -> b0
+        "vmovapd 128(%%rdx), %%ymm1\n\t"           // [B+16] -> b0
         "vpermilpd $5, %%ymm4, %%ymm7\n\t"
         "vfmadd231pd %%ymm4, %%ymm5, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm4, %%ymm6, %%ymm15\n\t"  // c2_1 += a0 * b1
-        "vmovapd 160(%%rbx), %%ymm2\n\t"           // [B+20] -> b1
+        "vmovapd 160(%%rdx), %%ymm2\n\t"           // [B+20] -> b1
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
-        "prefetcht0 384(%%rbx)\n\t"
+        "prefetcht0 384(%%rdx)\n\t"
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm8\n\t"  // c0_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm9\n\t"  // c0_1 += a0 * b1
@@ -387,11 +389,11 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vperm2f128 $3, %%ymm3, %%ymm3, %%ymm0\n\t"
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm11\n\t"  // c1_1 += a0 * b1
-        "vmovapd 192(%%rbx), %%ymm5\n\t"           // [B+8] -> b0'
+        "vmovapd 192(%%rdx), %%ymm5\n\t"           // [B+8] -> b0'
         "vpermilpd $5, %%ymm0, %%ymm3\n\t"
         "vfmadd231pd %%ymm0, %%ymm1, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm0, %%ymm2, %%ymm15\n\t"  // c2_1 += a0 * b1
-        "vmovapd 224(%%rbx), %%ymm6\n\t"           // [B+12] -> b1'
+        "vmovapd 224(%%rdx), %%ymm6\n\t"           // [B+12] -> b1'
         "vfmadd231pd %%ymm3, %%ymm1, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm3, %%ymm2, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
@@ -402,18 +404,21 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "vperm2f128 $3, %%ymm7, %%ymm7, %%ymm4\n\t"
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm10\n\t"  // c1_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm11\n\t"  // c1_1 += a0 * b1
-        "vmovapd 256(%%rbx), %%ymm1\n\t"           // [B+16] -> b0
+        "vmovapd 256(%%rdx), %%ymm1\n\t"           // [B+16] -> b0
         "vpermilpd $5, %%ymm4, %%ymm7\n\t"
         "vfmadd231pd %%ymm4, %%ymm5, %%ymm14\n\t"  // c2_0 += a0 * b0
         "vfmadd231pd %%ymm4, %%ymm6, %%ymm15\n\t"  // c2_1 += a0 * b1
-        "vmovapd 288(%%rbx), %%ymm2\n\t"           // [B+20] -> b1
+        "vmovapd 288(%%rdx), %%ymm2\n\t"           // [B+20] -> b1
         "vfmadd231pd %%ymm7, %%ymm5, %%ymm12\n\t"  // c3_0 += a0 * b0
         "vfmadd231pd %%ymm7, %%ymm6, %%ymm13\n\t"  // c3_1 += a0 * b1
         "\n\t"
         "addq $4*4*8, %%rax\n\t"  // A += 4*M
-        "addq $4*8*8, %%rbx\n\t"  // B += 4*N
+        "addq $4*8*8, %%rdx\n\t"  // B += 4*N
         "decq %%rsi\n\t"
         "jne .loop.start.L1"
+        "\n\t"
+        "movl $222,%%ebx\n\t"  // IACA/OSACA END MARKER
+        ".byte 100,103,144\n\t"
         "\n\t"
         "vshufpd $10, %%ymm10, %%ymm8, %%ymm0\n\t"
         "vshufpd $10, %%ymm8, %%ymm10, %%ymm1\n\t"
@@ -449,8 +454,8 @@ struct MicroKernel<4, 8, K, MicroKernelType::kButterflyPermunation, MicroKernelL
         "m"(C),      // 2
         "m"(k_iter)  // 3
         :            // register clobber list
-        "rax", "rbx", "rcx", "rsi", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
-        "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15");
+        "rax", "ebx", "rdx", "rcx", "rsi", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6",
+        "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15", "memory");
     // double *C0 = C;
     // double *C1 = C0 + N;
     // double *C2 = C1 + N;
