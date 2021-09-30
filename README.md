@@ -52,6 +52,15 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
   - registers: 16 x 256bit
   - cache line size: 64bytes(8 FP64)
 
+- Detailed Memory information
+
+  | Level |    Type     |  Size  | Ways | Sets  | Latency |
+  | :---: | :---------: | :----: | :--: | :---: | :-----: |
+  |  L1   |    Data     | 32 KB  |  8   |  64   |
+  |  L1   | Instruction | 32 KB  |  8   |  64   |
+  |  L2   |    Data     | 256 KB |  4   | 1024  |
+  |  L3   |    Data     |  9 MB  |  12  | 12288 |
+
 - Instruction Timing
 
   |       Intrinsics        | Instruction | Latency | Throughput |
@@ -95,16 +104,16 @@ for my hardware in single thread
 |       K       |   640    |         |                  |
 |      MR       |    4     |         |                  |
 |      NR       |    8     |         |                  |
-|      KC       |   320    |         |                  |
-|      MC       |   640    |         |                  |
-|      NC       |    40    |         |                  |
+|      KC       |   256    |         |                  |
+|      MC       |    64    |         |                  |
+|      NC       |   640    |         |                  |
 |       A       |  (M, K)  | 3276800 |     3.125 MB     |
 |       B       |  (K, N)  | 3276800 |     3.125 MB     |
 |       C       |  (M, N)  | 3276800 |     3.125 MB     |
-|      Ac       | (MC, KC) | 1638400 |    1.5625 MB     |
-|      Bc       | (KC, NC) | 102400  |      100 KB      |
-|   Ac-Slice    | (MR, KC) |  10240  |      10 KB       |
-|   Bc-Slice    | (KC, NR) |  20480  |      20 KB       |
+|      Ac       | (MC, KC) | 131072  |      128 KB      |
+|      Bc       | (KC, NC) | 1310720 |     1.25 MB      |
+|   Ac-Slice    | (MR, KC) |  10240  |       8 KB       |
+|   Bc-Slice    | (KC, NR) |  20480  |      16 KB       |
 |      Cc       | (MR, NR) |   256   |      256 B       |
 
 # Benchmarks

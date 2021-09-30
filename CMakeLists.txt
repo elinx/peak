@@ -20,3 +20,5 @@ target_link_libraries(openblas lib_openblas)
 find_package(Halide)
 add_executable(halide_reference halide_reference.cpp)
 target_link_libraries(halide_reference Halide::Halide "-lopenblas")
+
+add_executable(cache-latency-checker cache_latency_checker.cpp)

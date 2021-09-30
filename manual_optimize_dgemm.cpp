@@ -7,8 +7,8 @@
 #include "halide_benchmark.h"
 #include "halide_macros.h"
 
-constexpr uint32_t l1_cache_size = 192 * 1024;
-constexpr uint32_t l2_cache_size = 1536 * 1024;
+constexpr uint32_t l1_cache_size = 32 * 1024;
+constexpr uint32_t l2_cache_size = 256 * 1024;
 constexpr uint32_t l3_cache_size = 9 * 1024 * 1024;
 
 enum class MicroKernelType {
@@ -799,8 +799,8 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   constexpr uint32_t TILE_W = 8;
   constexpr uint32_t TILE_K = 320;
 
-  constexpr uint32_t m_outer_step = TILE_H * 160;
-  constexpr uint32_t n_outer_step = TILE_W * 40;
+  constexpr uint32_t m_outer_step = TILE_H * 16;
+  constexpr uint32_t n_outer_step = TILE_W * 80;
   constexpr uint32_t k_outer_step = TILE_K;
 
   const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
