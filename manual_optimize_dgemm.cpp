@@ -33,12 +33,12 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
   }
 }
 
-// template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
+// template <uint32_t KC, uint32_t NC, uint32_t NR>
 // static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
 //                   uint32_t n_outer) {
-//   for (uint32_t nn = 0; nn < n_inner_bound; nn += n_inner_step) {
-//     for (uint32_t k = 0; k < k_inner_bound; ++k) {
-//       for (uint32_t n = 0; n < n_inner_step; ++n) {
+//   for (uint32_t nn = 0; nn < NC; nn += NR) {
+//     for (uint32_t k = 0; k < KC; ++k) {
+//       for (uint32_t n = 0; n < NR; ++n) {
 //         // TODO: remove this branch
 //         if ((k + k_outer) < K && (nn + n_outer + n) < N) {
 //           *Bp++ = B[k * N + n];
@@ -47,49 +47,49 @@ void naive_dgemm(const double *A, const double *B, double *C, const uint32_t M, 
 //         }
 //       }
 //     }
-//     B += n_inner_step;
+//     B += NR;
 //   }
 // }
 
-template <uint32_t k_inner_bound, uint32_t n_inner_bound, uint32_t n_inner_step>
+template <uint32_t KC, uint32_t NC, uint32_t NR>
 static void PackB(double *Bp, const double *B, uint32_t K, uint32_t N, uint32_t k_outer,
                   uint32_t n_outer) {
-  uint32_t k_size = std::min(k_inner_bound, K - k_outer);
-  uint32_t n_size = std::min(n_inner_bound, N - n_outer);
+  uint32_t k_size = std::min(KC, K - k_outer);
+  uint32_t n_size = std::min(NC, N - n_outer);
   uint32_t k = 0;
   for (; k < k_size; ++k) {
     uint32_t n = 0;
-    for (; n <= (n_size - n_inner_step); n += n_inner_step) {
+    for (; n <= (n_size - NR); n += NR) {
       __m256d v1 = _mm256_load_pd(&B[k * N + n]);
       __m256d v2 = _mm256_load_pd(&B[k * N + n + 4]);
-      _mm256_store_pd(&Bp[n * k_inner_bound + k * n_inner_step], v1);
-      _mm256_store_pd(&Bp[n * k_inner_bound + k * n_inner_step + 4], v2);
-      // for (uint32_t nn = 0; nn < n_inner_step; ++nn) {
-      //   Bp[n * k_inner_bound + k * n_inner_step + nn] = B[k * N + n + nn];
+      _mm256_store_pd(&Bp[n * KC + k * NR], v1);
+      _mm256_store_pd(&Bp[n * KC + k * NR + 4], v2);
+      // for (uint32_t nn = 0; nn < NR; ++nn) {
+      //   Bp[n * KC + k * NR + nn] = B[k * N + n + nn];
       // }
     }
     for (; n < n_size; ++n) {
-      uint32_t b = n / n_inner_step * n_inner_step * k_inner_bound;
-      uint32_t s = k * n_inner_step;
-      uint32_t p = n % n_inner_step;
+      uint32_t b = n / NR * NR * KC;
+      uint32_t s = k * NR;
+      uint32_t p = n % NR;
       Bp[b + s + p] = B[k * N + n];
     }
-    for (; n < n_inner_bound; ++n) {
-      uint32_t b = n / n_inner_step * n_inner_step * k_inner_bound;
-      uint32_t s = k * n_inner_step;
-      uint32_t p = n % n_inner_step;
+    for (; n < NC; ++n) {
+      uint32_t b = n / NR * NR * KC;
+      uint32_t s = k * NR;
+      uint32_t p = n % NR;
       Bp[b + s + p] = 0;
     }
   }
-  memset((void *)&Bp[k * n_inner_bound], 0, (k_inner_bound - k) * n_inner_bound * sizeof(double));
+  memset((void *)&Bp[k * NC], 0, (KC - k) * NC * sizeof(double));
 }
 
-template <uint32_t m_inner_bound, uint32_t k_inner_bound, uint32_t m_inner_step>
+template <uint32_t MC, uint32_t KC, uint32_t MR>
 static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t m_outer,
                   uint32_t k_outer) {
-  for (uint32_t mm = 0; mm < m_inner_bound; mm += m_inner_step) {
-    for (uint32_t k = 0; k < k_inner_bound; ++k) {
-      for (uint32_t m = 0; m < m_inner_step; ++m) {
+  for (uint32_t mm = 0; mm < MC; mm += MR) {
+    for (uint32_t k = 0; k < KC; ++k) {
+      for (uint32_t m = 0; m < MR; ++m) {
         // TODO: remove this branch
         if ((k + k_outer) < K && (mm + m_outer + m) < M) {
           *Ap++ = A[m * K + k];
@@ -98,16 +98,15 @@ static void PackA(double *Ap, const double *A, uint32_t M, uint32_t K, uint32_t 
         }
       }
     }
-    A += m_inner_step * K;
+    A += MR * K;
   }
 }
 
-template <uint32_t m_inner_bound, uint32_t n_inner_bound, uint32_t m_inner_step,
-          uint32_t n_inner_step>
+template <uint32_t MC, uint32_t NC, uint32_t MR, uint32_t NR>
 static void WriteBackC(double *Cc, double *C, uint32_t M, uint32_t N, uint32_t m_outer,
                        uint32_t n_outer) {
-  for (uint32_t m = 0; m < m_inner_step; ++m) {
-    for (uint32_t n = 0; n < n_inner_step; ++n) {
+  for (uint32_t m = 0; m < MR; ++m) {
+    for (uint32_t n = 0; n < NR; ++n) {
       if ((m_outer + m) < M && (n_outer + n) < N) {
         C[(m)*N + n] += *Cc;
       }
@@ -795,49 +794,36 @@ struct MicroKernel<8, 8, K, MicroKernelType::kBroadcast, MicroKernelLang::kIntri
 
 void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M, const uint32_t N,
                   const uint32_t K) {
-  constexpr uint32_t TILE_H = 4;
-  constexpr uint32_t TILE_W = 8;
-  constexpr uint32_t TILE_K = 320;
+  constexpr uint32_t MR = 4;
+  constexpr uint32_t NR = 8;
+  constexpr uint32_t KC = 320;
 
-  constexpr uint32_t m_outer_step = TILE_H * 16;
-  constexpr uint32_t n_outer_step = TILE_W * 80;
-  constexpr uint32_t k_outer_step = TILE_K;
+  constexpr uint32_t MC = MR * 16;
+  constexpr uint32_t NC = NR * 80;
 
-  const uint32_t m_outer_bound = (M + m_outer_step - 1) / m_outer_step * m_outer_step;
-  const uint32_t n_outer_bound = (N + n_outer_step - 1) / n_outer_step * n_outer_step;
-  const uint32_t k_outer_bound = (K + n_outer_step - 1) / n_outer_step * n_outer_step;
+  const uint32_t m_outer_bound = (M + MC - 1) / MC * MC;
+  const uint32_t n_outer_bound = (N + NC - 1) / NC * NC;
+  const uint32_t k_outer_bound = (K + NC - 1) / NC * NC;
 
-  constexpr uint32_t m_inner_bound = m_outer_step;
-  constexpr uint32_t n_inner_bound = n_outer_step;
-  constexpr uint32_t k_inner_bound = k_outer_step;
+  static_assert(!(NC % NR));
+  static_assert(!(MC % MR));
+  static_assert(!(KC % 4));
 
-  constexpr uint32_t m_inner_step = TILE_H;
-  constexpr uint32_t n_inner_step = TILE_W;
+  double *Bc = (double *)aligned_alloc(32, sizeof(double) * KC * NC);
+  double *Ac = (double *)aligned_alloc(32, sizeof(double) * MC * KC);
+  double *Cc = (double *)aligned_alloc(32, sizeof(double) * MR * NR);
 
-  static_assert(!(n_inner_bound % n_inner_step));
-  static_assert(!(m_inner_bound % m_inner_step));
-  static_assert(!(k_inner_bound % 4));
-
-  double *Bc = (double *)aligned_alloc(32, sizeof(double) * k_inner_bound * n_inner_bound);
-  double *Ac = (double *)aligned_alloc(32, sizeof(double) * m_inner_bound * k_inner_bound);
-  double *Cc = (double *)aligned_alloc(32, sizeof(double) * m_inner_step * n_inner_step);
-
-  for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += k_outer_step) {
-    for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += m_outer_step) {
-      PackA<m_inner_bound, k_inner_bound, m_inner_step>(Ac, &A[m_outer * K + k_outer], M, K,
-                                                        m_outer, k_outer);
-      for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += n_outer_step) {
-        PackB<k_inner_bound, n_inner_bound, n_inner_step>(Bc, &B[k_outer * N + n_outer], K, N,
-                                                          k_outer, n_outer);
-        for (uint32_t n_inner = 0; n_inner < n_inner_bound; n_inner += n_inner_step) {
-          for (uint32_t m_inner = 0; m_inner < m_inner_bound; m_inner += m_inner_step) {
-            MicroKernel<m_inner_step, n_inner_step, k_inner_bound,
-                        MicroKernelType::kButterflyPermunation,
-                        MicroKernelLang::kAssembly>::run(&Ac[m_inner * k_inner_bound],
-                                                         &Bc[n_inner * k_inner_bound], Cc);
-            WriteBackC<m_inner_bound, n_inner_bound, m_inner_step, n_inner_step>(
-                Cc, &C[(m_outer + m_inner) * N + n_outer + n_inner], M, N, m_outer + m_inner,
-                n_outer + n_inner);
+  for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += NC) {
+    for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += KC) {
+      PackB<KC, NC, NR>(Bc, &B[k_outer * N + n_outer], K, N, k_outer, n_outer);
+      for (uint32_t m_outer = 0; m_outer < m_outer_bound; m_outer += MC) {
+        PackA<MC, KC, MR>(Ac, &A[m_outer * K + k_outer], M, K, m_outer, k_outer);
+        for (uint32_t n_inner = 0; n_inner < NC; n_inner += NR) {
+          for (uint32_t m_inner = 0; m_inner < MC; m_inner += MR) {
+            MicroKernel<MR, NR, KC, MicroKernelType::kButterflyPermunation,
+                        MicroKernelLang::kAssembly>::run(&Ac[m_inner * KC], &Bc[n_inner * KC], Cc);
+            WriteBackC<MC, NC, MR, NR>(Cc, &C[(m_outer + m_inner) * N + n_outer + n_inner], M, N,
+                                       m_outer + m_inner, n_outer + n_inner);
           }
         }
       }
