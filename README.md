@@ -78,7 +78,7 @@ Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtr
 
 # Theorical Peak Performance
 
-Coffee Lake microarch has two issue ports each has a `FMA` unit(see the previous diagram), so at most two floating point instructions(`add` and `mul`) could be done per-cycle, in addition the CPU supports `avx2` extension with 256bit register which could hold 4 FP64(8 FP32) values, as a result 16 FP64 instructions could be executed per-cycle. The CPU could boost it's frequency from 2.8GHz to at most 4GHz, so the peak performance could be 64GFLOPS(FP64).
+Coffee Lake microarch has two issue ports each has a `FMA` unit(see the previous diagram), so at most two floating point instructions(`add` and `mul`) could be done per-cycle, in addition the CPU supports `avx2` extension with 256bit register which could hold 4 FP64(8 FP32) values, as a result 16 FP64 instructions could be executed per-cycle. The CPU could boost it's frequency from 2.8GHz to at most 4GHz but we disable turbo mode for stablization, so the peak performance could be 44.8GFLOPS(FP64).
 
 Also the following formula could be used:
 
@@ -89,8 +89,18 @@ N_CORES * FREQUENCY * FMA * UNITS * (SIZE_OF_VECTOR/64)
 for my hardware in single thread
 
 ```
-1 * 4 * 2 * 2 * (256/64) = 64
+1 * 2.8 * 2 * 2 * (256/64) = 44.8
 ```
+
+# Micro Kernel
+
+$$
+(m_rn_r + 2m_r + 2n_r ) × element\_size ≤ (n_f + n_{rf}) × p_f
+$$
+
+- $n_f$: number of floating point registers, 16 in this case
+- $n_{rf}$:
+- $p_f$: size of one floating point register in bytes, 32 in this case
 
 # Memory Schedule
 
@@ -120,10 +130,10 @@ for my hardware in single thread
 
 ## Single Thread
 
-|  Method   | GFLOPS(FP64) |
-| :-------: | :----------: |
-|  Theory   |      64      |
-|    MKL    |  56.971941   |
-| OpenBlas  |  51.170771   |
-| naive-ijk |   1.960400   |
-|  manual   |  46.719804   |
+|  Method   | GFLOPS(FP64) | Percentage |
+| :-------: | :----------: | :--------: |
+|  Theory   |     44.8     |     -      |
+|    MKL    |  41.753118   |   93.20%   |
+| OpenBlas  |  35.995601   |   80.34%   |
+| naive-ijk |   1.455575   |   3.24%    |
+|  manual   |  33.138241   |   73.97%   |
