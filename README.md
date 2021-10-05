@@ -96,8 +96,8 @@ for my hardware in single thread
 
 |               |  Shape   | Memory  | Memory(Readable) |
 | :-----------: | :------: | :-----: | :--------------: |
-| L1 Cache Size |          | 196608  |      192 KB      |
-| L2 Cache Size |          | 1572864 |      1.5 MB      |
+| L1 Cache Size |          |  32768  |      32 KB       |
+| L2 Cache Size |          | 262144  |      256 KB      |
 | L3 Cache Size |          | 9437184 |       9 MB       |
 |       M       |   640    |         |                  |
 |       N       |   640    |         |                  |

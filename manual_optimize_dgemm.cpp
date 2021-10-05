@@ -809,9 +809,10 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
   static_assert(!(MC % MR));
   static_assert(!(KC % 4));
 
-  double *Bc = (double *)aligned_alloc(32, sizeof(double) * KC * NC);
-  double *Ac = (double *)aligned_alloc(32, sizeof(double) * MC * KC);
-  double *Cc = (double *)aligned_alloc(32, sizeof(double) * MR * NR);
+  double *buf = (double *)aligned_alloc(32, sizeof(double) * ((KC * NC) + (MC * KC) + (MR * NR)));
+  double *Bc = buf;
+  double *Ac = buf + KC * NC;
+  double *Cc = Ac + MC * KC;
 
   for (uint32_t n_outer = 0; n_outer < n_outer_bound; n_outer += NC) {
     for (uint32_t k_outer = 0; k_outer < k_outer_bound; k_outer += KC) {
@@ -829,9 +830,7 @@ void manual_dgemm(const double *A, const double *B, double *C, const uint32_t M,
       }
     }
   }
-  free(Cc);
-  free(Ac);
-  free(Bc);
+  free(buf);
 }
 
 int main() {
